@@ -120,7 +120,7 @@ bool AppInit(int argc, char* argv[])
 
 #ifndef WIN32
         if (gArgs.GetBoolArg("-daemon", false)) {
-            fprintf(stdout, "HU server starting\n");
+            fprintf(stdout, "PIV2 server starting\n");
 
             // Daemonize
             pid_t pid = fork();

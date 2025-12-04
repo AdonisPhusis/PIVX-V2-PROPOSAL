@@ -22,21 +22,15 @@ sudo apt update && sudo apt install -y \
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source ~/.cargo/env
 
-# === STEP 3: BerkeleyDB 4.8 ===
-cd /tmp
-wget http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz
-tar -xzf db-4.8.30.NC.tar.gz && cd db-4.8.30.NC
-sed -i 's/__atomic_compare_exchange/__atomic_compare_exchange_db/g' dbinc/atomic.h
-cd build_unix
-../dist/configure --enable-cxx --disable-shared --with-pic --with-mutex=POSIX/pthreads/library --prefix=/usr/local/BerkeleyDB.4.8
-make -j$(nproc) && sudo make install
+# === STEP 3: BerkeleyDB 5.3 ===
+sudo apt install -y libdb5.3++-dev
 
 # === STEP 4: PIV2 Core ===
 cd ~
 git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL.git PIV2-Core
 cd PIV2-Core
 ./autogen.sh
-./configure --without-gui
+./configure --without-gui --with-incompatible-bdb
 make -j$(nproc)
 
 # === STEP 5: Sapling Parameters ===
@@ -78,26 +72,13 @@ cargo --version
 
 ---
 
-## Step 3: Install BerkeleyDB 4.8
+## Step 3: Install BerkeleyDB 5.3
 
 ```bash
-cd /tmp
-wget http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz
-tar -xzf db-4.8.30.NC.tar.gz
-cd db-4.8.30.NC
-
-# Patch for modern GCC
-sed -i 's/__atomic_compare_exchange/__atomic_compare_exchange_db/g' dbinc/atomic.h
-
-# Build & Install
-cd build_unix
-../dist/configure --enable-cxx --disable-shared --with-pic --with-mutex=POSIX/pthreads/library --prefix=/usr/local/BerkeleyDB.4.8
-make -j$(nproc)
-sudo make install
-
-# Verify
-ls /usr/local/BerkeleyDB.4.8/lib/libdb_cxx*
+sudo apt install -y libdb5.3++-dev
 ```
+
+**Note:** BDB 5.3 is recommended. BDB 4.8 has wallet compatibility issues on Ubuntu 24.04+.
 
 ---
 
@@ -108,7 +89,7 @@ cd ~
 git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL.git PIV2-Core
 cd PIV2-Core
 ./autogen.sh
-./configure --without-gui
+./configure --without-gui --with-incompatible-bdb
 make -j$(nproc)
 ```
 
@@ -127,17 +108,26 @@ make -j$(nproc)
 ```bash
 mkdir -p ~/.piv2
 
+# Generate RPC password
+RPC_PASS=$(openssl rand -hex 32)
+
+# Create config with [test] section for testnet-specific settings
 echo "testnet=1
 server=1
 daemon=1
 listen=1
-rpcuser=piv2user
-rpcpassword=$(openssl rand -hex 32)
-rpcport=27172
-rpcallowip=127.0.0.1
+logtimestamps=1
+txindex=1
+
+[test]
 port=27171
-logtimestamps=1" > ~/.piv2/piv2.conf
+rpcport=27172
+rpcuser=piv2user
+rpcpassword=$RPC_PASS
+rpcallowip=127.0.0.1" > ~/.piv2/piv2.conf
 ```
+
+**Note:** The `[test]` section is required for testnet-specific settings like port and rpcport.
 
 ---
 
@@ -179,6 +169,56 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable piv2d
 sudo systemctl start piv2d
+```
+
+---
+
+## Masternode Setup
+
+### Step 1: Generate Masternode Key
+
+```bash
+./src/piv2-cli -testnet createmasternodekey
+```
+
+Save the output - this is your `masternodeprivkey`.
+
+### Step 2: Update Configuration
+
+Add to your `~/.piv2/piv2.conf` in the `[test]` section:
+
+```ini
+[test]
+# ... existing settings ...
+externalip=YOUR_VPS_IP
+masternode=1
+masternodeprivkey=YOUR_KEY_FROM_STEP_1
+```
+
+### Step 3: Add Peer Nodes
+
+Add other testnet nodes to connect:
+
+```ini
+[test]
+# ... existing settings ...
+addnode=PEER_IP_1:27171
+addnode=PEER_IP_2:27171
+```
+
+### Step 4: Restart Daemon
+
+```bash
+./src/piv2-cli -testnet stop
+sleep 3
+./src/piv2d -daemon
+```
+
+### Step 5: Verify Masternode Status
+
+```bash
+./src/piv2-cli -testnet getmasternodestatus
+./src/piv2-cli -testnet listmasternodes
 ```
 
 ---
@@ -262,6 +302,36 @@ Error: Cannot find the Sapling parameters in the following directory:
 "/home/ubuntu/.pivx-params"
 ```
 **Fix:** Run `./params/install-params.sh`
+
+### Block Database Corrupted
+```
+ERROR: LoadBlockIndexGuts : failed to read value
+Error loading block database
+```
+**Fix:** Remove corrupted data and reindex:
+```bash
+rm -rf ~/.piv2/testnet5/blocks ~/.piv2/testnet5/chainstate ~/.piv2/testnet5/evodb
+./src/piv2d -reindex
+```
+
+### Port Settings Warning
+```
+Warning: Config setting for -port only applied on test network when in [test] section.
+```
+**Fix:** Put port/rpcport settings inside `[test]` section in piv2.conf (see Step 6).
+
+### BDB 4.8 Wallet Crash (HD Wallet Creation)
+```
+DeriveNewSeed: AddKeyPubKey failed
+Segmentation fault
+```
+**Fix:** Use BDB 5.3 instead of 4.8:
+```bash
+sudo apt install libdb5.3++-dev
+./configure --without-gui --with-incompatible-bdb
+make clean && make -j$(nproc)
+rm -rf ~/.piv2/testnet5/wallet.dat ~/.piv2/testnet5/database
+```
 
 ---
 

@@ -7,7 +7,7 @@
 #include "scheduler.h"
 #include "utiltime.h"
 #if defined(HAVE_CONFIG_H)
-#include "config/pivx-config.h"
+#include "config/piv2-config.h"
 #endif
 
 #include <boost/thread.hpp>

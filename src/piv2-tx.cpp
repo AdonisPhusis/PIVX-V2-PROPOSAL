@@ -4,7 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #if defined(HAVE_CONFIG_H)
-#include "config/hu-config.h"
+#include "config/piv2-config.h"
 #endif
 
 #include "clientversion.h"

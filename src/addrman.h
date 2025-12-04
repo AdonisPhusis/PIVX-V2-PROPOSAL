@@ -8,7 +8,7 @@
 #define HU_ADDRMAN_H
 
 #if defined(HAVE_CONFIG_H)
-#include "config/pivx-config.h"
+#include "config/piv2-config.h"
 #endif //HAVE_CONFIG_H
 
 #include "clientversion.h"

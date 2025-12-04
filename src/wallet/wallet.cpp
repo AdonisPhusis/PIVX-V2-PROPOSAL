@@ -8,7 +8,7 @@
 #include "optional.h"
 #include "validation.h"
 #if defined(HAVE_CONFIG_H)
-#include "config/pivx-config.h"
+#include "config/piv2-config.h"
 #endif
 
 #include "wallet/wallet.h"

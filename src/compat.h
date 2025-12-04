@@ -8,7 +8,7 @@
 #define HU_COMPAT_H
 
 #if defined(HAVE_CONFIG_H)
-#include "config/pivx-config.h"
+#include "config/piv2-config.h"
 #endif
 
 #ifdef WIN32

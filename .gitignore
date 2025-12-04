@@ -63,8 +63,6 @@ conftest.err
 libtool
 src/config/piv2-config.h
 src/config/piv2-config.h.in
-src/config/hu-config.h
-src/config/hu-config.h.in
 src/config/stamp-h1
 src/obj
 share/setup.nsi

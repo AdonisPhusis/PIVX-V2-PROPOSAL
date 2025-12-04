@@ -153,7 +153,7 @@ echo "[5/5] Writing output to $OUTPUT_FILE..."
 # Create JSON output
 cat > "$OUTPUT_FILE" << EOF
 {
-  "network": "hu-testnet",
+  "network": "piv2-testnet",
   "generated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "note": "Keys generated via regtest - pubKeyHash is network-agnostic",
   "warning": "NEVER commit this file to git! Keep private keys secure!",

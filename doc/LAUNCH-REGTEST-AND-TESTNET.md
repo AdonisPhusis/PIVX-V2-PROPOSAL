@@ -102,7 +102,7 @@ ADDR=$(./src/testnet_local.sh cli 1 getnewaddress)
 The testnet genesis was mined on 2025-12-03 with the following parameters:
 
 ```
-Network ID:   hu-testnet
+Network ID:   piv2-testnet
 Timestamp:    1733270400 (Dec 2025)
 nNonce:       69256
 Genesis Hash: 00000ccd2bb9199976393bdf55f29163ee853fc3cb7dd67e79b838dbfdacfb39
@@ -176,7 +176,7 @@ addnode=<seed2-ip>:51474
 
 | Parameter | Value |
 |-----------|-------|
-| Network ID | `hu-testnet` |
+| Network ID | `piv2-testnet` |
 | Default Port | 51474 |
 | RPC Port | 51475 |
 | Magic Bytes | `0xf5, 0xe6, 0xd5, 0xca` |

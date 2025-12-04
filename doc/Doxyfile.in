@@ -1,0 +1,23 @@
+# Doxyfile 1.8.17 - PIV2 Core Documentation
+
+PROJECT_NAME           = "PIVX V2 Core"
+PROJECT_NUMBER         = @PACKAGE_VERSION@
+PROJECT_BRIEF          = "PIV2/KHU Cryptocurrency"
+OUTPUT_DIRECTORY       = doc/doxygen
+
+INPUT                  = src
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */test/* */bench/*
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+
+HAVE_DOT               = NO

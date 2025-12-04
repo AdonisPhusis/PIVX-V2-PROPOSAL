@@ -5,8 +5,10 @@
 #include "blocksignature.h"
 
 #include "chainparams.h"
+#include "consensus/params.h"  // Consensus::HU_COINBASE_MATURITY
 #include "script/standard.h"
 #include "util/system.h"
+#include "validation.h"  // chainActive, cs_main
 
 static bool GetKeyIDFromUTXO(const CTxOut& utxo, CKeyID& keyIDRet)
 {
@@ -63,6 +65,16 @@ bool CheckBlockSignature(const CBlock& block)
     // In production (mainnet/testnet), blocks MUST be signed by masternodes
     if (Params().IsRegTestNet()) {
         return true;
+    }
+
+    // Testnet bootstrap: Allow unsigned blocks for first 10 blocks (maturity period)
+    // This enables initial MN registration before DMM can start producing signed blocks
+    if (Params().IsTestnet()) {
+        LOCK(cs_main);
+        if (chainActive.Height() < Consensus::Params::HU_COINBASE_MATURITY) {
+            LogPrintf("%s: Testnet bootstrap - allowing unsigned block at height %d\n", __func__, chainActive.Height() + 1);
+            return true;
+        }
     }
 
     if (block.vchBlockSig.empty())

@@ -253,8 +253,10 @@ UniValue generate(const JSONRPCRequest& request)
             HelpExampleCli("generate", "11") +
             HelpExampleRpc("generate", "11"));
 
+    // PIV2 uses DMM consensus - generate only allowed in regtest
+    // On testnet/mainnet, blocks are produced by masternodes via DMM scheduler
     if (!Params().IsRegTestNet())
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "generate is only available in regtest mode");
+        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "generate is only available in regtest mode. PIV2 testnet/mainnet uses DMM for block production.");
 
     int nGenerate = request.params[0].get_int();
     if (nGenerate <= 0)

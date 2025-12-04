@@ -12,19 +12,19 @@
 #define CLIENT_VERSION_BUILD 0
 
 /* Version is release */
-#define CLIENT_VERSION_IS_RELEASE false
+#define CLIENT_VERSION_IS_RELEASE true
 
 /* Major version */
-#define CLIENT_VERSION_MAJOR 5
+#define CLIENT_VERSION_MAJOR 0
 
 /* Minor version */
-#define CLIENT_VERSION_MINOR 6
+#define CLIENT_VERSION_MINOR 9
 
 /* Build revision */
-#define CLIENT_VERSION_REVISION 99
+#define CLIENT_VERSION_REVISION 0
 
 /* Version is release */
-#define COPYRIGHT_YEAR 2024
+#define COPYRIGHT_YEAR 2025
 
 /* Define this symbol to build code that uses AVX2 intrinsics */
 #define ENABLE_AVX2 1
@@ -354,22 +354,22 @@
 #define LT_OBJDIR ".libs/"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "https://github.com/hu-project/hu/issues"
+#define PACKAGE_BUGREPORT "https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL/issues"
 
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "HU Core"
+#define PACKAGE_NAME "PIVX V2 Core"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "HU Core 5.6.99"
+#define PACKAGE_STRING "PIVX V2 Core 0.9.0"
 
 /* Define to the one symbol short name of this package. */
-#define PACKAGE_TARNAME "hu"
+#define PACKAGE_TARNAME "piv2"
 
 /* Define to the home page for this package. */
-#define PACKAGE_URL "https://www.hu.org/"
+#define PACKAGE_URL "https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "5.6.99"
+#define PACKAGE_VERSION "0.9.0"
 
 /* Path to the zk params dir during unit tests on windows */
 #define PARAMS_DIR ""

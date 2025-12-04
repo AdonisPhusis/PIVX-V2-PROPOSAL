@@ -103,17 +103,7 @@ cd ~
 git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL.git PIV2-Core
 cd PIV2-Core
 
-# Initialize submodules (required for leveldb, secp256k1, etc.)
-git submodule update --init --recursive
-
-# Fix leveldb if submodule is incomplete (missing builder.cc)
-if [ ! -f src/leveldb/db/builder.cc ]; then
-    rm -rf src/leveldb
-    git clone https://github.com/google/leveldb.git src/leveldb
-    cd src/leveldb && git checkout 1.22 && cd ../..
-fi
-
-# Build
+# Build (autogen.sh handles submodules and leveldb automatically)
 ./autogen.sh
 ./configure --without-gui --with-incompatible-bdb
 make -j$(nproc)
@@ -122,6 +112,8 @@ make -j$(nproc)
 ./src/piv2d --version
 # Expected: PIVX V2 Core Daemon version v0.9.0
 ```
+
+> **Note:** `autogen.sh` automatically initializes git submodules and fixes incomplete leveldb if needed.
 
 ### Build Options
 
@@ -427,6 +419,21 @@ make -j$(nproc)
 ```
 
 The key is to run `./configure` AFTER installing Rust so it detects `cargo`.
+
+### Build Fails: Leveldb builder.cc Not Found
+
+If `autogen.sh` didn't fix leveldb automatically:
+
+```bash
+# Manual fix
+rm -rf src/leveldb
+git clone --depth 1 --branch 1.22 https://github.com/google/leveldb.git src/leveldb
+
+# Then rebuild
+./autogen.sh
+./configure --without-gui --with-incompatible-bdb
+make -j$(nproc)
+```
 
 ### Daemon Won't Start
 

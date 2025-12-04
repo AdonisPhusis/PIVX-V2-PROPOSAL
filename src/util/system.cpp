@@ -78,7 +78,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
-const char * const PIVX_CONF_FILENAME = "hu.conf";  // HU Chain config file
+const char * const PIVX_CONF_FILENAME = "piv2.conf";  // PIV2 Chain config file
 const char * const PIVX_MASTERNODE_CONF_FILENAME = "masternode.conf";
 
 
@@ -550,10 +550,10 @@ fs::path GetDefaultDataDir()
     // Mac
     pathRet /= "Library/Application Support";
     TryCreateDirectories(pathRet);
-    return pathRet / "PIVX";
+    return pathRet / "PIV2";
 #else
     // Unix
-    return pathRet / ".pivx";
+    return pathRet / ".piv2";
 #endif
 #endif
 }

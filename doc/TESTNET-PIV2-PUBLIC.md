@@ -58,8 +58,8 @@ nBits:       0x1e0ffff0
 
 ```bash
 # Build from source
-git clone https://github.com/AdonisPhusis/PIVX-V6-KHU
-cd PIVX-V6-KHU/PIVX
+git clone https://github.com/AdonisPhusis/PIV2-Core
+cd PIV2-Core
 ./autogen.sh
 ./configure --without-gui --with-incompatible-bdb
 make -j$(nproc)
@@ -285,7 +285,7 @@ Run the pre-testnet validation suite:
 
 ## Support
 
-- **GitHub Issues**: https://github.com/AdonisPhusis/PIVX-V6-KHU/issues
+- **GitHub Issues**: https://github.com/AdonisPhusis/PIV2-Core/issues
 - **Documentation**: `/docs/` directory
 
 ---

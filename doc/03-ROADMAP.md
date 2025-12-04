@@ -324,7 +324,7 @@ VerifyMasternodeSignature(mnOutpoint, sigHash, vchSig)
 
 | Ressource | Chemin |
 |-----------|--------|
-| Repository | `github.com/AdonisPhusis/PIVX-V6-KHU` |
+| Repository | `github.com/AdonisPhusis/PIV2-Core` |
 | Branch | `testnet-local-prep` |
 | Blueprints | `/docs/blueprints/` |
 | Presentation | `/docs/presentation/` |

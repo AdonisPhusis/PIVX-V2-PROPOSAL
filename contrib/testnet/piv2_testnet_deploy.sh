@@ -171,16 +171,16 @@ build_piv2() {
 
     cd /tmp
 
-    if [[ -d "PIVX-V6-KHU" ]]; then
+    if [[ -d "PIV2-Core" ]]; then
         log_info "Updating existing repository..."
-        cd PIVX-V6-KHU
+        cd PIV2-Core
         git fetch origin
         git checkout testnet-ready-v1
         git pull
     else
         log_info "Cloning repository..."
-        git clone https://github.com/AdonisPhusis/PIVX-V6-KHU.git
-        cd PIVX-V6-KHU
+        git clone https://github.com/AdonisPhusis/PIV2-Core.git
+        cd PIV2-Core
         git checkout testnet-ready-v1
     fi
 

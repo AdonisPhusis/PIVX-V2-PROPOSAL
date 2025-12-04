@@ -38,7 +38,9 @@ sudo apt install -y \
     libtool \
     autotools-dev \
     automake \
+    autoconf \
     pkg-config \
+    autoconf-archive \
     bsdmainutils \
     python3
 

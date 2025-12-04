@@ -79,7 +79,9 @@ setup_system() {
         libtool \
         autotools-dev \
         automake \
+        autoconf \
         pkg-config \
+        autoconf-archive \
         bsdmainutils \
         python3 \
         libevent-dev \

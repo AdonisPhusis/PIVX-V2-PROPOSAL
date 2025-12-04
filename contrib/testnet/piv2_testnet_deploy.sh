@@ -85,17 +85,13 @@ setup_system() {
         bsdmainutils \
         python3 \
         libevent-dev \
-        libboost-system-dev \
-        libboost-filesystem-dev \
-        libboost-test-dev \
-        libboost-thread-dev \
+        libboost-all-dev \
         libssl-dev \
         libdb5.3-dev \
         libdb5.3++-dev \
         libzmq3-dev \
         libminiupnpc-dev \
         libnatpmp-dev \
-        libqrencode-dev \
         libsodium-dev \
         libgmp-dev \
         git \

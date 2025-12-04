@@ -1,19 +1,71 @@
 # PIV2 Testnet - Installation Guide
 
-**Version:** 0.9.0
-**Target:** Ubuntu 24.04 / 25.04 LTS
+**Version:** 1.0.0
+**Target:** Ubuntu 22.04 / 24.04 / 25.04 LTS
 **Date:** December 2025
 
 ---
 
-## Quick Start (One-liner)
+## Quick Start (Copy-Paste)
+
+Complete installation on a fresh Ubuntu VPS. Copy-paste this entire block:
 
 ```bash
-# As root on a fresh VPS:
-curl -sSL https://raw.githubusercontent.com/AdonisPhusis/PIVX-V2-PROPOSAL/main/contrib/testnet/piv2_testnet_deploy.sh | bash -s install mn1
+#!/bin/bash
+set -e
+
+echo "=== PIV2 Testnet Installation ==="
+
+# === STEP 1: Install system dependencies ===
+echo "[1/5] Installing system dependencies..."
+sudo apt update && sudo apt install -y \
+    build-essential libtool autotools-dev automake autoconf pkg-config \
+    autoconf-archive bsdmainutils python3 git curl wget jq ufw \
+    libevent-dev libboost-all-dev libssl-dev libzmq3-dev \
+    libminiupnpc-dev libsodium-dev libgmp-dev
+
+# === STEP 2: Install Rust (required for Sapling) ===
+echo "[2/5] Installing Rust..."
+if ! command -v cargo &> /dev/null; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source ~/.cargo/env
+fi
+cargo --version
+
+# === STEP 3: Install BerkeleyDB 4.8 (wallet support) ===
+echo "[3/5] Installing BerkeleyDB 4.8..."
+cd /tmp
+wget -q http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz
+tar -xzf db-4.8.30.NC.tar.gz
+cd db-4.8.30.NC
+sed -i 's/__atomic_compare_exchange/__atomic_compare_exchange_db/g' dbinc/atomic.h
+cd build_unix
+../dist/configure --enable-cxx --disable-shared --with-pic --prefix=/usr/local/BerkeleyDB.4.8
+make -j$(nproc)
+sudo make install
+echo "[OK] BerkeleyDB 4.8 installed"
+
+# === STEP 4: Clone and build PIV2 ===
+echo "[4/5] Building PIV2..."
+cd ~
+git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL.git PIV2-Core
+cd PIV2-Core
+./autogen.sh
+./configure --without-gui \
+    BDB_LIBS="-L/usr/local/BerkeleyDB.4.8/lib -ldb_cxx-4.8" \
+    BDB_CFLAGS="-I/usr/local/BerkeleyDB.4.8/include"
+make -j$(nproc)
+
+# === STEP 5: Verify ===
+echo "[5/5] Verifying installation..."
+./src/piv2d --version
+
+echo ""
+echo "=== PIV2 Installation Complete ==="
+echo "Run: ./src/piv2d -testnet -daemon"
 ```
 
-Or follow the manual steps below.
+Or follow the detailed steps below.
 
 ---
 
@@ -58,12 +110,8 @@ sudo apt install -y \
     libsodium-dev \
     libgmp-dev
 
-# Install Berkeley DB (for wallet)
-# Ubuntu 24.04/25.04:
-sudo apt install -y libdb-dev libdb++-dev
-
-# If libdb5.3 is available (older Ubuntu):
-# sudo apt install -y libdb5.3-dev libdb5.3++-dev
+# NOTE: BerkeleyDB 4.8 is installed separately in Step 2
+# Do NOT install libdb5.3 - we use BDB 4.8 for wallet compatibility
 
 # Install utilities
 sudo apt install -y git curl jq ufw
@@ -85,13 +133,55 @@ dpkg -l | grep libboost
 # Check OpenSSL version
 openssl version
 
-# Check if libdb is installed
-dpkg -l | grep libdb
+# Check Rust
+cargo --version
 ```
 
 ---
 
-## Step 2: Clone and Build
+## Step 2: Install BerkeleyDB 4.8
+
+PIV2 wallet requires BerkeleyDB 4.8 for compatibility. Ubuntu 24.04+ doesn't include it, so we compile from source.
+
+### Option A: Use the install script (recommended)
+
+```bash
+cd ~/PIV2-Core
+./contrib/wallet/install_bdb48.sh
+```
+
+### Option B: Manual installation
+
+```bash
+cd /tmp
+
+# Download BDB 4.8
+wget http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz
+tar -xzf db-4.8.30.NC.tar.gz
+cd db-4.8.30.NC
+
+# Patch for modern GCC (required for GCC 10+)
+sed -i 's/__atomic_compare_exchange/__atomic_compare_exchange_db/g' dbinc/atomic.h
+
+# Build
+cd build_unix
+../dist/configure --enable-cxx --disable-shared --with-pic --prefix=/usr/local/BerkeleyDB.4.8
+make -j$(nproc)
+sudo make install
+
+# Verify
+ls /usr/local/BerkeleyDB.4.8/lib/libdb_cxx*
+```
+
+Expected output:
+```
+/usr/local/BerkeleyDB.4.8/lib/libdb_cxx-4.8.a
+/usr/local/BerkeleyDB.4.8/lib/libdb_cxx.a
+```
+
+---
+
+## Step 3: Clone and Build PIV2
 
 ```bash
 # Create user (optional but recommended)
@@ -103,14 +193,20 @@ cd ~
 git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL.git PIV2-Core
 cd PIV2-Core
 
-# Build (autogen.sh handles submodules and leveldb automatically)
+# Generate configure script
 ./autogen.sh
-./configure --without-gui --with-incompatible-bdb
+
+# Configure with BDB 4.8
+./configure --without-gui \
+    BDB_LIBS="-L/usr/local/BerkeleyDB.4.8/lib -ldb_cxx-4.8" \
+    BDB_CFLAGS="-I/usr/local/BerkeleyDB.4.8/include"
+
+# Compile
 make -j$(nproc)
 
 # Verify build
 ./src/piv2d --version
-# Expected: PIVX V2 Core Daemon version v0.9.0
+# Expected: PIV2 Core Daemon version v1.0.0
 ```
 
 > **Note:** `autogen.sh` automatically initializes git submodules and fixes incomplete leveldb if needed.
@@ -126,7 +222,7 @@ make -j$(nproc)
 
 ---
 
-## Step 3: Configure
+## Step 4: Configure
 
 ### Create Data Directory
 
@@ -184,7 +280,7 @@ echo "RPC Password: $RPC_PASS"
 
 ---
 
-## Step 4: Configure Firewall
+## Step 5: Configure Firewall
 
 ```bash
 # Allow SSH
@@ -202,7 +298,7 @@ sudo ufw status
 
 ---
 
-## Step 5: Create Systemd Service
+## Step 6: Create Systemd Service
 
 ```bash
 sudo cat > /etc/systemd/system/piv2d.service << 'EOF'
@@ -241,7 +337,7 @@ sudo systemctl start piv2d
 
 ---
 
-## Step 6: Verify Installation
+## Step 7: Verify Installation
 
 ```bash
 # Check service status
@@ -386,15 +482,32 @@ piv2-cli listmasternodes
 
 ## Troubleshooting
 
-### Build Fails: Berkeley DB
+### Build Fails: Berkeley DB (undefined reference to `Dbt::~Dbt()`)
+
+If you see linker errors like:
+```
+undefined reference to `Dbt::~Dbt()'
+undefined reference to `Db::~Db()'
+collect2: error: ld returned 1 exit status
+```
+
+This means BerkeleyDB is not properly linked. Fix:
 
 ```bash
-# Install alternative BDB
-sudo apt install libdb-dev libdb++-dev
+# 1. Install BDB 5.3 (the only version available on Ubuntu 24.04+)
+sudo apt install -y libdb5.3-dev libdb5.3++-dev
 
-# Or compile with any BDB version
-./configure --with-incompatible-bdb --without-gui
+# 2. Clean and reconfigure with --with-incompatible-bdb flag
+make clean
+./configure --without-gui --with-incompatible-bdb
+make -j$(nproc)
 ```
+
+**Why `--with-incompatible-bdb`?**
+- Ubuntu 24.04+ only provides BerkeleyDB 5.3, not 4.8
+- The `--with-incompatible-bdb` flag tells the build system to accept BDB 5.3
+- The wallet will work normally, but won't be portable to systems using BDB 4.8
+- For testnet nodes, this is perfectly fine
 
 ### Build Fails: Boost Not Found
 

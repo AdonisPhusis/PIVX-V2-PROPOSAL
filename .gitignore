@@ -99,6 +99,8 @@ src/qt/test/moc*.cpp
 *.iso
 
 *.json.h
+!src/invalid_outpoints.json.h
+!src/invalid_serials.json.h
 *.raw.h
 
 # Only ignore unexpected patches

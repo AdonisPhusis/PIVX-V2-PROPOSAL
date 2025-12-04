@@ -96,11 +96,11 @@ public:
 
     bool IsRegTestNet() const {
         return NetworkIDString() == CBaseChainParams::REGTEST ||
-               NetworkIDString() == "piv2-regtest";
+               NetworkIDString() == "hu-regtest";
     }
     bool IsTestnet() const {
         return NetworkIDString() == CBaseChainParams::TESTNET ||
-               NetworkIDString() == "piv2-testnet";
+               NetworkIDString() == "hu-testnet";
     }
 
     /** Tier two requests blockage mark expiration time */

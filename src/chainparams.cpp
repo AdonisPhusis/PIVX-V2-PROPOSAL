@@ -553,7 +553,7 @@ class CTestNetParams : public CChainParams
 public:
     CTestNetParams()
     {
-        strNetworkID = "piv2-testnet";
+        strNetworkID = "hu-testnet";
 
         // ═══════════════════════════════════════════════════════════════════════
         // PIVHU Testnet Genesis - FINAL

@@ -87,6 +87,19 @@ AC_PATH_PROG([GENHTML], [genhtml])
 AC_PATH_PROG([GIT], [git])
 AC_PATH_PROG([RUSTC], [rustc])
 AC_PATH_PROG([CARGO], [cargo])
+
+dnl Check if Cargo is available, provide helpful error message
+if test -z "$CARGO"; then
+  AC_MSG_ERROR([Cargo (Rust package manager) not found.
+
+PIV2 requires Rust for Sapling support. Install it with:
+
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source ~/.cargo/env
+
+Then run ./configure again.
+  ])
+fi
 AC_PATH_PROG([CCACHE], [ccache])
 AC_PATH_PROG([XGETTEXT], [xgettext])
 AC_PATH_PROG([HEXDUMP], [hexdump])

@@ -1,5 +1,6 @@
 #!/bin/sh
 # Copyright (c) 2013-2016 The Bitcoin Core developers
+# Copyright (c) 2025 The PIV2 developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,6 +8,11 @@ export LC_ALL=C
 set -e
 srcdir="$(dirname $0)"
 cd "$srcdir"
+
+# Load Rust/Cargo if available (required for Sapling)
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
 
 # Initialize submodules if needed
 if [ ! -d "src/secp256k1/.git" ] || [ ! -d "src/leveldb/.git" ]; then

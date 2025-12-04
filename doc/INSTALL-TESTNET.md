@@ -99,6 +99,13 @@ cd PIV2-Core
 # Initialize submodules (required for leveldb, secp256k1, etc.)
 git submodule update --init --recursive
 
+# Fix leveldb if submodule is incomplete (missing builder.cc)
+if [ ! -f src/leveldb/db/builder.cc ]; then
+    rm -rf src/leveldb
+    git clone https://github.com/google/leveldb.git src/leveldb
+    cd src/leveldb && git checkout 1.22 && cd ../..
+fi
+
 # Build
 ./autogen.sh
 ./configure --without-gui --with-incompatible-bdb

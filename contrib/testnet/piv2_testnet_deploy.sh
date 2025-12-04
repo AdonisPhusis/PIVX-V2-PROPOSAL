@@ -190,6 +190,15 @@ build_piv2() {
     log_info "Initializing submodules..."
     git submodule update --init --recursive
 
+    # Fix leveldb if submodule is incomplete
+    if [[ ! -f "src/leveldb/db/builder.cc" ]]; then
+        log_warn "Leveldb submodule incomplete, cloning manually..."
+        rm -rf src/leveldb
+        git clone https://github.com/google/leveldb.git src/leveldb
+        cd src/leveldb && git checkout 1.22 && cd ../..
+        log_success "Leveldb 1.22 installed"
+    fi
+
     log_info "Running autogen..."
     ./autogen.sh
 

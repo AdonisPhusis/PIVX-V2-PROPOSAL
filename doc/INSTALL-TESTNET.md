@@ -96,6 +96,9 @@ cd ~
 git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL.git PIV2-Core
 cd PIV2-Core
 
+# Initialize submodules (required for leveldb, secp256k1, etc.)
+git submodule update --init --recursive
+
 # Build
 ./autogen.sh
 ./configure --without-gui --with-incompatible-bdb

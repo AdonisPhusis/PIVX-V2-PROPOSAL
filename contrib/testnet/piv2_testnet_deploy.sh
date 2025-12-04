@@ -187,6 +187,9 @@ build_piv2() {
         git checkout main
     fi
 
+    log_info "Initializing submodules..."
+    git submodule update --init --recursive
+
     log_info "Running autogen..."
     ./autogen.sh
 

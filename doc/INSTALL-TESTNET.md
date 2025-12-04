@@ -49,7 +49,7 @@ make -j$(nproc)
 
 - Ubuntu 24.04 or 25.04 LTS
 - 2GB RAM minimum (4GB recommended)
-- 20GB disk space
+- 5GB disk space
 
 ---
 

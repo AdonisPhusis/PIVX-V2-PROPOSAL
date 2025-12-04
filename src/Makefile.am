@@ -49,6 +49,9 @@ if ENABLE_WALLET
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
 endif
 
+# Fallback for CARGO if not set by configure (e.g., Rust installed after configure)
+CARGO ?= cargo
+
 RUST_ENV_VARS = RUSTC="$(RUSTC)" TERM=dumb
 RUST_BUILD_OPTS = --release
 

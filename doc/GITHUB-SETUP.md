@@ -162,7 +162,7 @@ make -j$(nproc)
 
 ## Contact
 
-- **GitHub Issues**: https://github.com/AdonisPhusis/PIV2-Core/issues
+- **GitHub Issues**: https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL/issues
 
 ---
 

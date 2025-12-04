@@ -93,7 +93,7 @@ PIVX/src/
 
 ## Liens Externes
 
-- **Repository:** [github.com/AdonisPhusis/PIV2-Core](https://github.com/AdonisPhusis/PIV2-Core)
+- **Repository:** [github.com/AdonisPhusis/PIVX-V2-PROPOSAL](https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL)
 - **Branch:** `testnet-local-prep`
 - **PIVX Issues:** [github.com/PIVX-Project/PIVX/issues](https://github.com/PIVX-Project/PIVX/issues) (78 → 0 avec PIV2)
 

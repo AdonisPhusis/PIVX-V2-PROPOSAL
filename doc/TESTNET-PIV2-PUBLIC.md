@@ -58,7 +58,7 @@ nBits:       0x1e0ffff0
 
 ```bash
 # Build from source
-git clone https://github.com/AdonisPhusis/PIV2-Core
+git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL
 cd PIV2-Core
 ./autogen.sh
 ./configure --without-gui --with-incompatible-bdb
@@ -285,7 +285,7 @@ Run the pre-testnet validation suite:
 
 ## Support
 
-- **GitHub Issues**: https://github.com/AdonisPhusis/PIV2-Core/issues
+- **GitHub Issues**: https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL/issues
 - **Documentation**: `/docs/` directory
 
 ---

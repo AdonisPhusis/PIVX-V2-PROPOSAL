@@ -171,20 +171,18 @@ build_piv2() {
 
     cd /tmp
 
-    if [[ -d "PIV2-Core" ]]; then
+    if [[ -d "PIVX-V2-PROPOSAL" ]]; then
         log_info "Updating existing repository..."
-        cd PIV2-Core
+        cd PIVX-V2-PROPOSAL
         git fetch origin
-        git checkout testnet-ready-v1
+        git checkout main
         git pull
     else
         log_info "Cloning repository..."
-        git clone https://github.com/AdonisPhusis/PIV2-Core.git
-        cd PIV2-Core
-        git checkout testnet-ready-v1
+        git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL.git
+        cd PIVX-V2-PROPOSAL
+        git checkout main
     fi
-
-    cd PIVX
 
     log_info "Running autogen..."
     ./autogen.sh

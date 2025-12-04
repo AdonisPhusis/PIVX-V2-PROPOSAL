@@ -67,6 +67,13 @@ sudo apt install -y libdb-dev libdb++-dev
 
 # Install utilities
 sudo apt install -y git curl jq ufw
+
+# Install Rust (required for Sapling/shielded transactions)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source ~/.cargo/env
+
+# Verify Rust installation
+cargo --version
 ```
 
 ### Verify Dependencies
@@ -403,6 +410,23 @@ sudo apt install libdb-dev libdb++-dev
 # Install all boost components
 sudo apt install libboost-all-dev
 ```
+
+### Build Fails: Cargo/Rust Not Found
+
+If you see error: `/bin/bash: line 1: build: command not found` at `cargo-build`:
+
+```bash
+# Install Rust if not installed
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source ~/.cargo/env
+
+# IMPORTANT: Reconfigure to detect cargo
+make clean
+./configure --without-gui --with-incompatible-bdb
+make -j$(nproc)
+```
+
+The key is to run `./configure` AFTER installing Rust so it detects `cargo`.
 
 ### Daemon Won't Start
 

@@ -105,6 +105,14 @@ setup_system() {
         fail2ban
 
     log_success "System dependencies installed"
+
+    # Install Rust (required for Sapling)
+    log_info "Installing Rust..."
+    if ! command -v cargo &> /dev/null; then
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source "$HOME/.cargo/env"
+    fi
+    log_success "Rust installed: $(cargo --version)"
 }
 
 setup_firewall() {

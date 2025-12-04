@@ -39,7 +39,10 @@ cd PIV2-Core
 ./configure --without-gui
 make -j$(nproc)
 
-# === STEP 5: Verify ===
+# === STEP 5: Sapling Parameters ===
+./params/install-params.sh
+
+# === STEP 6: Verify ===
 ./src/piv2d --version
 ```
 
@@ -107,14 +110,19 @@ cd PIV2-Core
 ./autogen.sh
 ./configure --without-gui
 make -j$(nproc)
-
-# Verify
-./src/piv2d --version
 ```
 
 ---
 
-## Step 5: Configure
+## Step 5: Sapling Parameters
+
+```bash
+./params/install-params.sh
+```
+
+---
+
+## Step 6: Configure
 
 ```bash
 mkdir -p ~/.piv2
@@ -133,7 +141,7 @@ logtimestamps=1" > ~/.piv2/piv2.conf
 
 ---
 
-## Step 6: Run
+## Step 7: Run
 
 ```bash
 # Start daemon
@@ -148,7 +156,7 @@ logtimestamps=1" > ~/.piv2/piv2.conf
 
 ---
 
-## Step 7: Systemd Service (Optional)
+## Step 8: Systemd Service (Optional)
 
 ```bash
 sudo tee /etc/systemd/system/piv2d.service << 'EOF'
@@ -247,6 +255,13 @@ source ~/.cargo/env
 ```bash
 pkill -9 piv2d
 ```
+
+### Sapling Parameters Missing
+```
+Error: Cannot find the Sapling parameters in the following directory:
+"/home/ubuntu/.pivx-params"
+```
+**Fix:** Run `./params/install-params.sh`
 
 ---
 

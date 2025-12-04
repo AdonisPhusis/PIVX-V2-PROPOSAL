@@ -119,29 +119,16 @@ make -j$(nproc)
 ```bash
 mkdir -p ~/.piv2
 
-cat > ~/.piv2/piv2.conf << 'EOF'
-# PIV2 Testnet Configuration
-testnet=1
+echo "testnet=1
 server=1
 daemon=1
 listen=1
-
-# RPC
 rpcuser=piv2user
-rpcpassword=CHANGE_ME
+rpcpassword=$(openssl rand -hex 32)
 rpcport=27172
 rpcallowip=127.0.0.1
-
-# P2P
 port=27171
-
-# Logging
-logtimestamps=1
-EOF
-
-# Generate secure RPC password
-RPC_PASS=$(openssl rand -hex 32)
-sed -i "s/CHANGE_ME/$RPC_PASS/" ~/.piv2/piv2.conf
+logtimestamps=1" > ~/.piv2/piv2.conf
 ```
 
 ---

@@ -1,0 +1,159 @@
+// Copyright (c) 2018 The Zcash developers
+// Copyright (c) 2025 The PIV2 developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#include "consensus/upgrades.h"
+
+/**
+ * HU Network Upgrade Information
+ * Ordered by Consensus::UpgradeIndex.
+ *
+ * Note: Upgrade indices are preserved for consensus compatibility.
+ * User-facing names have been updated to HU branding.
+ */
+const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
+        {
+                /*.strName =*/ "HU_base",
+                /*.strInfo =*/ "HU network genesis",
+        },
+        {
+                /*.strName =*/ "HU_bip65",
+                /*.strInfo =*/ "CLTV (BIP65) activation",
+        },
+        {
+                /*.strName =*/ "HU_v3",
+                /*.strInfo =*/ "256-bit block modifier",
+        },
+        {
+                /*.strName =*/ "HU_v4",
+                /*.strInfo =*/ "Message signatures - time protocol",
+        },
+        {
+                /*.strName =*/ "HU_sapling",
+                /*.strInfo =*/ "Sapling Shield activation",
+        },
+        {
+                /*.strName =*/ "HU_v5",
+                /*.strInfo =*/ "Delegation rules update",
+        },
+        {
+                /*.strName =*/ "HU_v5b",
+                /*.strInfo =*/ "Block validation update",
+        },
+        {
+                /*.strName =*/ "HU_rewards",
+                /*.strInfo =*/ "HU rewards structure",
+        },
+        {
+                /*.strName =*/ "HU_exchange",
+                /*.strInfo =*/ "Exchange address support",
+        },
+        {
+                /*.strName =*/ "HU_dmn",
+                /*.strInfo =*/ "Deterministic Masternodes (DMM)",
+        },
+        {
+                /*.strName =*/ "HU_test",
+                /*.strInfo =*/ "Test upgrade",
+        },
+};
+
+UpgradeState NetworkUpgradeState(
+        int nHeight,
+        const Consensus::Params& params,
+        Consensus::UpgradeIndex idx)
+{
+    assert(nHeight >= 0);
+    assert(idx >= Consensus::BASE_NETWORK && idx < Consensus::MAX_NETWORK_UPGRADES);
+    auto nActivationHeight = params.vUpgrades[idx].nActivationHeight;
+
+    if (nActivationHeight == Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT) {
+        return UPGRADE_DISABLED;
+    } else if (nHeight >= nActivationHeight) {
+        // From ZIP200:
+        //
+        // ACTIVATION_HEIGHT
+        //     The block height at which the network upgrade rules will come into effect.
+        //
+        //     For removal of ambiguity, the block at height ACTIVATION_HEIGHT - 1 is
+        //     subject to the pre-upgrade consensus rules.
+        return UPGRADE_ACTIVE;
+    } else {
+        return UPGRADE_PENDING;
+    }
+}
+
+bool NetworkUpgradeActive(
+        int nHeight,
+        const Consensus::Params& params,
+        Consensus::UpgradeIndex idx)
+{
+    return NetworkUpgradeState(nHeight, params, idx) == UPGRADE_ACTIVE;
+}
+
+int CurrentEpoch(int nHeight, const Consensus::Params& params) {
+    for (auto idxInt = Consensus::MAX_NETWORK_UPGRADES - 1; idxInt > Consensus::BASE_NETWORK; idxInt--) {
+        if (NetworkUpgradeActive(nHeight, params, Consensus::UpgradeIndex(idxInt))) {
+            return idxInt;
+        }
+    }
+    return Consensus::BASE_NETWORK;
+}
+
+bool IsActivationHeight(
+        int nHeight,
+        const Consensus::Params& params,
+        Consensus::UpgradeIndex idx)
+{
+    assert(idx >= Consensus::BASE_NETWORK && idx < Consensus::MAX_NETWORK_UPGRADES);
+
+    // Don't count BASE_NETWORK as an activation height
+    if (idx == Consensus::BASE_NETWORK) {
+        return false;
+    }
+
+    return nHeight >= 0 && nHeight == params.vUpgrades[idx].nActivationHeight;
+}
+
+bool IsActivationHeightForAnyUpgrade(
+        int nHeight,
+        const Consensus::Params& params)
+{
+    if (nHeight < 0) {
+        return false;
+    }
+
+    for (int idx = Consensus::BASE_NETWORK + 1; idx < (int) Consensus::MAX_NETWORK_UPGRADES; idx++) {
+        if (nHeight == params.vUpgrades[idx].nActivationHeight)
+            return true;
+    }
+
+    return false;
+}
+
+Optional<int> NextEpoch(int nHeight, const Consensus::Params& params) {
+    if (nHeight < 0) {
+        return nullopt;
+    }
+
+    // BASE_NETWORK is never pending
+    for (auto idx = Consensus::BASE_NETWORK + 1; idx < Consensus::MAX_NETWORK_UPGRADES; idx++) {
+        if (NetworkUpgradeState(nHeight, params, Consensus::UpgradeIndex(idx)) == UPGRADE_PENDING) {
+            return idx;
+        }
+    }
+
+    return nullopt;
+}
+
+Optional<int> NextActivationHeight(
+        int nHeight,
+        const Consensus::Params& params)
+{
+    auto idx = NextEpoch(nHeight, params);
+    if (idx) {
+        return params.vUpgrades[idx.get()].nActivationHeight;
+    }
+    return nullopt;
+}

@@ -197,34 +197,33 @@ static CBlock CreatePIVHUTestnetGenesisBlock(uint32_t nTime, uint32_t nNonce, ui
     txNew.vout.resize(5);
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PIVHU Testnet Genesis Keys - Generated 2025-12-03
+    // PIV2 Testnet Genesis Keys - Generated 2025-12-04
     // ═══════════════════════════════════════════════════════════════════════
     //
-    // Output 0: MN1 Collateral (10,000 HU)
-    //   Testnet Address: (derive from pubKeyHash with prefix 139)
-    //   pubKeyHash: 687cdc5d06a4ed81b41f4a694ccca26c2b7e66fe
+    // Output 0: MN1 Collateral (10,000 PIV2)
+    //   pubKeyHash: 87060609b12d797fd2396629957fde4a3d3adbff
     txNew.vout[0].nValue = 10000 * COIN;
-    txNew.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("687cdc5d06a4ed81b41f4a694ccca26c2b7e66fe") << OP_EQUALVERIFY << OP_CHECKSIG;
+    txNew.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("87060609b12d797fd2396629957fde4a3d3adbff") << OP_EQUALVERIFY << OP_CHECKSIG;
 
-    // Output 1: MN2 Collateral (10,000 HU)
-    //   pubKeyHash: f839118dfb45fbd9983833ac52bf5d27047f4d35
+    // Output 1: MN2 Collateral (10,000 PIV2)
+    //   pubKeyHash: 2563dfb22c186e7d2741ed6d785856f7f17e187a
     txNew.vout[1].nValue = 10000 * COIN;
-    txNew.vout[1].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("f839118dfb45fbd9983833ac52bf5d27047f4d35") << OP_EQUALVERIFY << OP_CHECKSIG;
+    txNew.vout[1].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("2563dfb22c186e7d2741ed6d785856f7f17e187a") << OP_EQUALVERIFY << OP_CHECKSIG;
 
-    // Output 2: MN3 Collateral (10,000 HU)
-    //   pubKeyHash: 64497f7f2fe10ff124ec66476ddfd4679d233140
+    // Output 2: MN3 Collateral (10,000 PIV2)
+    //   pubKeyHash: dd2ba22aec7280230ff03da61b7141d7acf12edd
     txNew.vout[2].nValue = 10000 * COIN;
-    txNew.vout[2].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("64497f7f2fe10ff124ec66476ddfd4679d233140") << OP_EQUALVERIFY << OP_CHECKSIG;
+    txNew.vout[2].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("dd2ba22aec7280230ff03da61b7141d7acf12edd") << OP_EQUALVERIFY << OP_CHECKSIG;
 
-    // Output 3: Dev Wallet (50,000,000 HU)
-    //   pubKeyHash: 5b1eed0b253e251f2d6e5f592aeac3b891d6d3dd
+    // Output 3: Dev Wallet (50,000,000 PIV2)
+    //   pubKeyHash: 197cf6a11f4214b4028389c77b90f27bc90dc839
     txNew.vout[3].nValue = 50000000 * COIN;
-    txNew.vout[3].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("5b1eed0b253e251f2d6e5f592aeac3b891d6d3dd") << OP_EQUALVERIFY << OP_CHECKSIG;
+    txNew.vout[3].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("197cf6a11f4214b4028389c77b90f27bc90dc839") << OP_EQUALVERIFY << OP_CHECKSIG;
 
-    // Output 4: Faucet (50,000,000 HU)
-    //   pubKeyHash: 2771c5c0e59bf7387251eef18c84532551a99296
+    // Output 4: Faucet (50,000,000 PIV2)
+    //   pubKeyHash: ec1ab14139850ef2520199c49ba1e46656c9e84f
     txNew.vout[4].nValue = 50000000 * COIN;
-    txNew.vout[4].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("2771c5c0e59bf7387251eef18c84532551a99296") << OP_EQUALVERIFY << OP_CHECKSIG;
+    txNew.vout[4].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("ec1ab14139850ef2520199c49ba1e46656c9e84f") << OP_EQUALVERIFY << OP_CHECKSIG;
 
     CBlock genesis;
     genesis.vtx.push_back(std::make_shared<const CTransaction>(std::move(txNew)));
@@ -569,12 +568,13 @@ public:
         //   Output 4: Faucet - 50,000,000 HU
         // Total: 100,030,000 HU
         // ═══════════════════════════════════════════════════════════════════════
-        genesis = CreatePIVHUTestnetGenesisBlock(1733270400, 69256, 0x1e0ffff0, 1);
+        // PIV2 Testnet Genesis - v2 keys mined 2025-12-04
+        genesis = CreatePIVHUTestnetGenesisBlock(1733270400, 575173, 0x1e0ffff0, 1);
         consensus.hashGenesisBlock = genesis.GetHash();
 
-        // Genesis validation
-        assert(consensus.hashGenesisBlock == uint256S("0x00000ccd2bb9199976393bdf55f29163ee853fc3cb7dd67e79b838dbfdacfb39"));
-        assert(genesis.hashMerkleRoot == uint256S("0xc6d69a493603f520dcb27b517cff152db034ff337055677ae3b9df915f100315"));
+        // Genesis validation - v2 keys generated 2025-12-04
+        assert(consensus.hashGenesisBlock == uint256S("0x000001a025bee548de2afe598046e04dfbffd26180207558b65104c4cc7b626d"));
+        assert(genesis.hashMerkleRoot == uint256S("0xf14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3"));
 
         // ═══════════════════════════════════════════════════════════════════════
         // HU Core Economic Parameters - TESTNET

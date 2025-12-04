@@ -1,16 +1,16 @@
 #!/bin/bash
 #
-# Generate Testnet Genesis Keys for PIVHU
+# Generate Testnet Genesis Keys for PIV2
 # =======================================
 #
 # This script generates 5 key pairs for the testnet genesis block:
-#   - MN1_OWNER: Masternode 1 collateral (10,000 HU)
-#   - MN2_OWNER: Masternode 2 collateral (10,000 HU)
-#   - MN3_OWNER: Masternode 3 collateral (10,000 HU)
-#   - DEV_WALLET: Development wallet (50,000,000 HU)
-#   - FAUCET: Public faucet (50,000,000 HU)
+#   - MN1_OWNER: Masternode 1 collateral (10,000 PIV2)
+#   - MN2_OWNER: Masternode 2 collateral (10,000 PIV2)
+#   - MN3_OWNER: Masternode 3 collateral (10,000 PIV2)
+#   - DEV_WALLET: Development wallet (50,000,000 PIV2)
+#   - FAUCET: Public faucet (50,000,000 PIV2)
 #
-# Output: /tmp/hu_testnet_genesis_keys.json (NOT in repo!)
+# Output: /tmp/piv2_testnet_genesis_keys.json (NOT in repo!)
 #
 # Note: Uses regtest to generate keys (pubKeyHash is network-agnostic)
 # The WIF will need conversion for testnet use, but pubKeyHash is universal.
@@ -22,30 +22,30 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HUD="$SCRIPT_DIR/hud"
-CLI="$SCRIPT_DIR/hu-cli"
-DATADIR="/tmp/hu_keygen_regtest"
-OUTPUT_FILE="/tmp/hu_testnet_genesis_keys.json"
+PIV2D="$SCRIPT_DIR/piv2d"
+CLI="$SCRIPT_DIR/piv2-cli"
+DATADIR="/tmp/piv2_keygen_regtest"
+OUTPUT_FILE="/tmp/piv2_testnet_genesis_keys.json"
 
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo "  PIVHU Testnet Genesis Key Generator"
+echo "  PIV2 Testnet Genesis Key Generator"
 echo "  (Using regtest for key generation - pubKeyHash is network-agnostic)"
 echo "═══════════════════════════════════════════════════════════════════════════"
 
 # Check binaries
-if [ ! -x "$HUD" ]; then
-    echo "ERROR: hud not found at $HUD"
-    echo "Please compile first: cd PIVX && make -j\$(nproc)"
+if [ ! -x "$PIV2D" ]; then
+    echo "ERROR: piv2d not found at $PIV2D"
+    echo "Please compile first: cd PIV2-Core && make -j\$(nproc)"
     exit 1
 fi
 
 if [ ! -x "$CLI" ]; then
-    echo "ERROR: hu-cli not found at $CLI"
+    echo "ERROR: piv2-cli not found at $CLI"
     exit 1
 fi
 
 # Kill any existing regtest processes
-pkill -f "hud.*keygen" 2>/dev/null || true
+pkill -f "piv2d.*keygen" 2>/dev/null || true
 sleep 1
 
 # Clean up any previous keygen data
@@ -53,7 +53,7 @@ rm -rf "$DATADIR"
 mkdir -p "$DATADIR"
 
 # Create minimal regtest config for key generation
-cat > "$DATADIR/pivx.conf" << 'EOF'
+cat > "$DATADIR/piv2.conf" << 'EOF'
 regtest=1
 server=1
 rpcuser=keygen
@@ -68,8 +68,8 @@ EOF
 echo ""
 echo "[1/5] Starting temporary regtest node for key generation..."
 
-# Start hud in background (regtest mode) with explicit RPC params
-"$HUD" -regtest -datadir="$DATADIR" -rpcuser=keygen -rpcpassword=keygen123 -rpcport=18998 -daemon -printtoconsole=0
+# Start piv2d in background (regtest mode) with explicit RPC params
+"$PIV2D" -regtest -datadir="$DATADIR" -rpcuser=keygen -rpcpassword=keygen123 -rpcport=18998 -daemon -printtoconsole=0
 
 # CLI command with explicit credentials
 CLI_CMD="$CLI -regtest -datadir=$DATADIR -rpcuser=keygen -rpcpassword=keygen123 -rpcport=18998"
@@ -230,7 +230,7 @@ echo "  Dev:    $DEV_HASH"
 echo "  Faucet: $FAUCET_HASH"
 echo ""
 echo "  Next steps:"
-echo "  1. Copy pubKeyHash values to CreatePIVHUTestnetGenesisBlock() in chainparams.cpp"
+echo "  1. Copy pubKeyHash values to CreatePIV2TestnetGenesisBlock() in chainparams.cpp"
 echo "  2. Recompile: make -j\$(nproc)"
 echo "  3. The genesis will be auto-mined on first testnet start"
 echo "  4. Import WIF keys into testnet wallet to access funds"

@@ -104,22 +104,22 @@ The testnet genesis was mined on 2025-12-03 with the following parameters:
 ```
 Network ID:   piv2-testnet
 Timestamp:    1733270400 (Dec 2025)
-nNonce:       69256
-Genesis Hash: 00000ccd2bb9199976393bdf55f29163ee853fc3cb7dd67e79b838dbfdacfb39
-Merkle Root:  c6d69a493603f520dcb27b517cff152db034ff337055677ae3b9df915f100315
+nNonce:       575173
+Genesis Hash: 000001a025bee548de2afe598046e04dfbffd26180207558b65104c4cc7b626d
+Merkle Root:  f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3
 ```
 
 **Genesis Distribution (100,030,000 PIV2 total):**
 
 | Output | Role | Amount PIV2 | pubKeyHash |
 |--------|------|-----------|------------|
-| 0 | MN1 Collateral | 10,000 | `687cdc5d06a4ed81b41f4a694ccca26c2b7e66fe` |
-| 1 | MN2 Collateral | 10,000 | `f839118dfb45fbd9983833ac52bf5d27047f4d35` |
-| 2 | MN3 Collateral | 10,000 | `64497f7f2fe10ff124ec66476ddfd4679d233140` |
-| 3 | Dev Wallet | 50,000,000 | `5b1eed0b253e251f2d6e5f592aeac3b891d6d3dd` |
-| 4 | Faucet | 50,000,000 | `2771c5c0e59bf7387251eef18c84532551a99296` |
+| 0 | MN1 Collateral | 10,000 | `87060609b12d797fd2396629957fde4a3d3adbff` |
+| 1 | MN2 Collateral | 10,000 | `2563dfb22c186e7d2741ed6d785856f7f17e187a` |
+| 2 | MN3 Collateral | 10,000 | `dd2ba22aec7280230ff03da61b7141d7acf12edd` |
+| 3 | Dev Wallet | 50,000,000 | `197cf6a11f4214b4028389c77b90f27bc90dc839` |
+| 4 | Faucet | 50,000,000 | `ec1ab14139850ef2520199c49ba1e46656c9e84f` |
 
-**Private keys:** Stored securely in `/tmp/hu_testnet_genesis_keys.json` (never in repo!)
+**Private keys:** Stored securely in `~/.piv2_keys/piv2_testnet_genesis_keys.json` (never in repo!)
 
 ### Generating New Testnet Keys (if needed)
 

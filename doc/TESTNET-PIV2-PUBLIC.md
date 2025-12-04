@@ -33,9 +33,9 @@ PIV2 (PIVX V2 / Knowledge Hedge Unit) is a cryptocurrency with:
 ## Genesis Block
 
 ```
-Hash:        00000ccd2bb9199976393bdf55f29163ee853fc3cb7dd67e79b838dbfdacfb39
-Merkle Root: c6d69a493603f520dcb27b517cff152db034ff337055677ae3b9df915f100315
-nNonce:      69256
+Hash:        000001a025bee548de2afe598046e04dfbffd26180207558b65104c4cc7b626d
+Merkle Root: f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3
+nNonce:      575173
 nTime:       1733270400 (Dec 4, 2025)
 nBits:       0x1e0ffff0
 ```

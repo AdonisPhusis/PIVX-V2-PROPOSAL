@@ -55,16 +55,16 @@ NETWORKS = {
 
 # Genesis outputs for testnet (P2PKH)
 TESTNET_OUTPUTS = [
-    # Output 0: MN1 Collateral (10,000 HU)
-    {'value': 10000 * 100000000, 'pubkeyhash': '687cdc5d06a4ed81b41f4a694ccca26c2b7e66fe'},
-    # Output 1: MN2 Collateral (10,000 HU)
-    {'value': 10000 * 100000000, 'pubkeyhash': 'f839118dfb45fbd9983833ac52bf5d27047f4d35'},
-    # Output 2: MN3 Collateral (10,000 HU)
-    {'value': 10000 * 100000000, 'pubkeyhash': '64497f7f2fe10ff124ec66476ddfd4679d233140'},
-    # Output 3: Dev Wallet (50,000,000 HU)
-    {'value': 50000000 * 100000000, 'pubkeyhash': '5b1eed0b253e251f2d6e5f592aeac3b891d6d3dd'},
-    # Output 4: Faucet (50,000,000 HU)
-    {'value': 50000000 * 100000000, 'pubkeyhash': '2771c5c0e59bf7387251eef18c84532551a99296'},
+    # Output 0: MN1 Collateral (10,000 PIV2)
+    {'value': 10000 * 100000000, 'pubkeyhash': '87060609b12d797fd2396629957fde4a3d3adbff'},
+    # Output 1: MN2 Collateral (10,000 PIV2)
+    {'value': 10000 * 100000000, 'pubkeyhash': '2563dfb22c186e7d2741ed6d785856f7f17e187a'},
+    # Output 2: MN3 Collateral (10,000 PIV2)
+    {'value': 10000 * 100000000, 'pubkeyhash': 'dd2ba22aec7280230ff03da61b7141d7acf12edd'},
+    # Output 3: Dev Wallet (50,000,000 PIV2)
+    {'value': 50000000 * 100000000, 'pubkeyhash': '197cf6a11f4214b4028389c77b90f27bc90dc839'},
+    # Output 4: Faucet (50,000,000 PIV2)
+    {'value': 50000000 * 100000000, 'pubkeyhash': 'ec1ab14139850ef2520199c49ba1e46656c9e84f'},
 ]
 
 # =============================================================================

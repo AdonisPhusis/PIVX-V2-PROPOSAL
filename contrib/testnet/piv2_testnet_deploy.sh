@@ -97,6 +97,7 @@ setup_system() {
         libnatpmp-dev \
         libqrencode-dev \
         libsodium-dev \
+        libgmp-dev \
         git \
         curl \
         jq \

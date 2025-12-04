@@ -55,7 +55,8 @@ sudo apt install -y \
     libssl-dev \
     libzmq3-dev \
     libminiupnpc-dev \
-    libsodium-dev
+    libsodium-dev \
+    libgmp-dev
 
 # Install Berkeley DB (for wallet)
 # Ubuntu 24.04/25.04:

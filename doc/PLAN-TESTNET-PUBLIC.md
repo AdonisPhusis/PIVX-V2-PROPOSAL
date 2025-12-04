@@ -250,9 +250,9 @@ printtoconsole=0
 
 ```bash
 # Télécharger binary
-wget https://github.com/PIV2-Core/releases/hu-testnet-v1.0.tar.gz
-tar xzf hu-testnet-v1.0.tar.gz
-cd hu-testnet
+wget https://github.com/PIV2-Core/releases/piv2-testnet-v1.0.tar.gz
+tar xzf piv2-testnet-v1.0.tar.gz
+cd piv2-testnet
 
 # Configuration
 mkdir -p ~/.hu

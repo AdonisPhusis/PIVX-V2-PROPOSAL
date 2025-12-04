@@ -20,7 +20,7 @@ PIV2 (PIVX V2 / Knowledge Hedge Unit) is a cryptocurrency with:
 
 | Parameter | Value |
 |-----------|-------|
-| **Chain ID** | `hu-testnet` |
+| **Chain ID** | `piv2-testnet` |
 | **P2P Port** | `27171` |
 | **RPC Port** | `27172` |
 | **Magic Bytes** | `0xfa 0xbf 0xb5 0xda` |

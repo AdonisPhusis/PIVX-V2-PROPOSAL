@@ -40,7 +40,7 @@ tar -xzf db-4.8.30.NC.tar.gz
 cd db-4.8.30.NC
 sed -i 's/__atomic_compare_exchange/__atomic_compare_exchange_db/g' dbinc/atomic.h
 cd build_unix
-../dist/configure --enable-cxx --disable-shared --with-pic --prefix=/usr/local/BerkeleyDB.4.8
+../dist/configure --enable-cxx --disable-shared --with-pic --with-mutex=POSIX/pthreads/library --prefix=/usr/local/BerkeleyDB.4.8
 make -j$(nproc)
 sudo make install
 echo "[OK] BerkeleyDB 4.8 installed"
@@ -51,9 +51,7 @@ cd ~
 git clone https://github.com/AdonisPhusis/PIVX-V2-PROPOSAL.git PIV2-Core
 cd PIV2-Core
 ./autogen.sh
-./configure --without-gui \
-    BDB_LIBS="-L/usr/local/BerkeleyDB.4.8/lib -ldb_cxx-4.8" \
-    BDB_CFLAGS="-I/usr/local/BerkeleyDB.4.8/include"
+./configure --without-gui
 make -j$(nproc)
 
 # === STEP 5: Verify ===
@@ -163,9 +161,9 @@ cd db-4.8.30.NC
 # Patch for modern GCC (required for GCC 10+)
 sed -i 's/__atomic_compare_exchange/__atomic_compare_exchange_db/g' dbinc/atomic.h
 
-# Build
+# Build (with POSIX mutex for Ubuntu 24.04+)
 cd build_unix
-../dist/configure --enable-cxx --disable-shared --with-pic --prefix=/usr/local/BerkeleyDB.4.8
+../dist/configure --enable-cxx --disable-shared --with-pic --with-mutex=POSIX/pthreads/library --prefix=/usr/local/BerkeleyDB.4.8
 make -j$(nproc)
 sudo make install
 
@@ -196,10 +194,8 @@ cd PIV2-Core
 # Generate configure script
 ./autogen.sh
 
-# Configure with BDB 4.8
-./configure --without-gui \
-    BDB_LIBS="-L/usr/local/BerkeleyDB.4.8/lib -ldb_cxx-4.8" \
-    BDB_CFLAGS="-I/usr/local/BerkeleyDB.4.8/include"
+# Configure (BDB 4.8 is auto-detected in /usr/local/BerkeleyDB.4.8)
+./configure --without-gui
 
 # Compile
 make -j$(nproc)
@@ -209,7 +205,7 @@ make -j$(nproc)
 # Expected: PIV2 Core Daemon version v1.0.0
 ```
 
-> **Note:** `autogen.sh` automatically initializes git submodules and fixes incomplete leveldb if needed.
+> **Note:** `configure` automatically detects BDB 4.8 in `/usr/local/BerkeleyDB.4.8` if installed.
 
 ### Build Options
 

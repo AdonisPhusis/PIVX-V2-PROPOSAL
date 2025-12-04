@@ -138,11 +138,12 @@ build_bdb() {
 
     cd "${WORK_DIR}/db-${BDB_VERSION}/build_unix"
 
-    # Configure
+    # Configure (with POSIX mutex for modern Linux)
     ../dist/configure \
         --enable-cxx \
         --disable-shared \
         --with-pic \
+        --with-mutex=POSIX/pthreads/library \
         --prefix="${BDB_PREFIX}" \
         > configure.log 2>&1 || {
             log_error "Configure failed. Check ${WORK_DIR}/db-${BDB_VERSION}/build_unix/configure.log"

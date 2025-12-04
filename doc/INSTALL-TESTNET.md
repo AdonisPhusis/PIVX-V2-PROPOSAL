@@ -1,6 +1,6 @@
 # PIV2 Testnet - Installation Guide
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Target:** Ubuntu 24.04 / 25.04 LTS
 **Date:** December 2025
 
@@ -122,9 +122,12 @@ txindex=1
 [test]
 port=27171
 rpcport=27172
+rpcbind=127.0.0.1
 rpcuser=piv2user
 rpcpassword=$RPC_PASS
-rpcallowip=127.0.0.1" > ~/.piv2/piv2.conf
+rpcallowip=127.0.0.1
+externalip=YOUR_VPS_IP
+maxconnections=125" > ~/.piv2/piv2.conf
 ```
 
 **Note:** The `[test]` section is required for testnet-specific settings like port and rpcport.
@@ -268,18 +271,32 @@ When a new version is released:
 
 ```bash
 # Stop node
-piv2-cli stop
+./src/piv2-cli -testnet stop
 sleep 5
 
-# Update code
+# Update code (discard local changes if any)
 cd ~/PIV2-Core
+git checkout -- .
 git pull origin main
 
 # Rebuild
 make -j$(nproc)
 
 # Restart
-piv2d -testnet -daemon
+./src/piv2d -testnet -daemon
+```
+
+**If you get "Wallet requires newer version" error:**
+```bash
+rm -rf ~/.piv2/testnet5/wallets ~/.piv2/testnet5/database ~/.piv2/testnet5/wallet.dat
+./src/piv2d -testnet -daemon
+```
+
+**If chain parameters changed (requires full reset):**
+```bash
+rm -rf ~/.piv2/testnet5/*
+./src/piv2d -testnet -daemon
+# Then re-initialize masternode (see Masternode Setup)
 ```
 
 ---
@@ -302,7 +319,7 @@ piv2-cli getnewaddress
 piv2-cli listunspent
 
 # Logs
-tail -f ~/.piv2/testnet/debug.log
+tail -f ~/.piv2/testnet5/debug.log
 ```
 
 ---
@@ -381,6 +398,50 @@ Error: Legacy masternode system disabled. Use -mnoperatorprivatekey to start as 
 2. Start daemon normally: `./src/piv2d -testnet -daemon`
 3. Use `initmasternode` RPC command (see Masternode Setup section)
 
+### Wallet Requires Newer Version
+```
+Error: Error loading : Wallet requires newer version of PIVX V2 Core
+```
+**Fix:** Remove old wallet data:
+```bash
+rm -rf ~/.piv2/testnet5/wallets ~/.piv2/testnet5/database ~/.piv2/testnet5/wallet.dat
+./src/piv2d -testnet -daemon
+```
+
+### This Is Not a Masternode
+```
+error code: -1
+error message: This is not a masternode.
+```
+**Fix:** Use DMN process instead of legacy:
+```bash
+./src/piv2-cli -testnet generateoperatorkeypair
+./src/piv2-cli -testnet initmasternode "YOUR_SECRET_KEY"
+```
+
+### Lock File Blocking Startup
+If daemon refuses to start after crash:
+```bash
+rm -f ~/.piv2/testnet5/.lock ~/.piv2/testnet5/.walletlock
+./src/piv2d -testnet -daemon
+```
+
+### Git Pull Fails (Local Changes)
+```
+error: Your local changes would be overwritten by merge
+```
+**Fix:** Discard local changes before pull:
+```bash
+git checkout -- .
+git pull origin main
+```
+
+### RPC Allowip Warning
+```
+WARNING: option -rpcallowip was specified without -rpcbind
+```
+**Fix:** Add `rpcbind=127.0.0.1` to the `[test]` section in piv2.conf.
+
 ---
 
 ## Support
@@ -390,4 +451,4 @@ Error: Legacy masternode system disabled. Use -mnoperatorprivatekey to start as 
 
 ---
 
-*PIV2 Testnet Installation Guide v1.1.0*
+*PIV2 Testnet Installation Guide v1.2.0*

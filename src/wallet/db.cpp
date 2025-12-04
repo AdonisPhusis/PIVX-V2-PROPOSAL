@@ -151,16 +151,23 @@ bool BerkeleyEnvironment::Open(bool retry)
     if (gArgs.GetBoolArg("-privdb", DEFAULT_WALLET_PRIVDB))
         nEnvFlags |= DB_PRIVATE;
 
+    LogPrintf("BerkeleyEnvironment::Open: Setting up dbenv...\n");
     dbenv->set_lg_dir(pathLogDir.string().c_str());
+    LogPrintf("BerkeleyEnvironment::Open: set_lg_dir done\n");
     dbenv->set_cachesize(0, 0x100000, 1); // 1 MiB should be enough for just the wallet
+    LogPrintf("BerkeleyEnvironment::Open: set_cachesize done\n");
     dbenv->set_lg_bsize(0x10000);
     dbenv->set_lg_max(1048576);
     dbenv->set_lk_max_locks(40000);
     dbenv->set_lk_max_objects(40000);
+    LogPrintf("BerkeleyEnvironment::Open: set_lk done\n");
     dbenv->set_errfile(fsbridge::fopen(pathErrorFile, "a")); /// debug
+    LogPrintf("BerkeleyEnvironment::Open: set_errfile done\n");
     dbenv->set_flags(DB_AUTO_COMMIT, 1);
     dbenv->set_flags(DB_TXN_WRITE_NOSYNC, 1);
+    LogPrintf("BerkeleyEnvironment::Open: set_flags done\n");
     dbenv->log_set_config(DB_LOG_AUTO_REMOVE, 1);
+    LogPrintf("BerkeleyEnvironment::Open: log_set_config done, calling open...\n");
     int ret = dbenv->open(strPath.c_str(),
         DB_CREATE |
             DB_INIT_LOCK |

@@ -173,52 +173,91 @@ sudo systemctl start piv2d
 
 ---
 
-## Masternode Setup
+## Masternode Setup (Deterministic - DMN)
 
-### Step 1: Generate Masternode Key
+PIV2 uses **Deterministic Masternodes (DMN)** - not the legacy system.
 
-```bash
-./src/piv2-cli -testnet createmasternodekey
-```
-
-Save the output - this is your `masternodeprivkey`.
-
-### Step 2: Update Configuration
-
-Add to your `~/.piv2/piv2.conf` in the `[test]` section:
-
-```ini
-[test]
-# ... existing settings ...
-externalip=YOUR_VPS_IP
-masternode=1
-masternodeprivkey=YOUR_KEY_FROM_STEP_1
-```
-
-### Step 3: Add Peer Nodes
-
-Add other testnet nodes to connect:
-
-```ini
-[test]
-# ... existing settings ...
-addnode=PEER_IP_1:27171
-addnode=PEER_IP_2:27171
-```
-
-### Step 4: Restart Daemon
+### Step 1: Clean Start
 
 ```bash
-./src/piv2-cli -testnet stop
+# Stop any running daemon
+pkill piv2d
+
+# Clean corrupted data if needed
+rm -rf ~/.piv2/testnet5/blocks ~/.piv2/testnet5/chainstate ~/.piv2/testnet5/evodb ~/.piv2/testnet5/khu ~/.piv2/testnet5/.lock
+
+# Start daemon (without masternode=1)
+./src/piv2d -testnet -daemon
 sleep 3
-./src/piv2d -daemon
 ```
 
-### Step 5: Verify Masternode Status
+### Step 2: Generate Addresses
+
+```bash
+./src/piv2-cli -testnet getnewaddress "owner"
+./src/piv2-cli -testnet getnewaddress "voting"
+./src/piv2-cli -testnet getnewaddress "payout"
+```
+
+Save these addresses for ProTx registration.
+
+### Step 3: Generate Operator Key
+
+```bash
+./src/piv2-cli -testnet generateoperatorkeypair
+```
+
+Output:
+```json
+{
+  "secret": "cXXX...your_secret_key",
+  "public": "03XXX...your_public_key"
+}
+```
+
+**Save both keys!** The secret is used to initialize, the public is used for ProTx.
+
+### Step 4: Initialize Masternode
+
+```bash
+./src/piv2-cli -testnet initmasternode "YOUR_SECRET_KEY"
+```
+
+### Step 5: Verify Status
 
 ```bash
 ./src/piv2-cli -testnet getmasternodestatus
-./src/piv2-cli -testnet listmasternodes
+```
+
+Expected output:
+```json
+{
+  "netaddr": "YOUR_IP:27171",
+  "status": "Waiting for ProTx to appear on-chain"
+}
+```
+
+### Step 6: Register ProTx (requires collateral)
+
+Once you have testnet coins (10000 PIV2 collateral):
+
+```bash
+./src/piv2-cli -testnet protx_register_fund "collateralAddress" "IP:27171" "ownerAddress" "operatorPubKey" "votingAddress" "payoutAddress"
+```
+
+### Add Peer Nodes
+
+Connect to other testnet nodes:
+
+```bash
+./src/piv2-cli -testnet addnode "PEER_IP:27171" "add"
+```
+
+Or add to config:
+```ini
+[test]
+addnode=PEER_IP_1:27171
+addnode=PEER_IP_2:27171
 ```
 
 ---
@@ -332,6 +371,15 @@ sudo apt install libdb5.3++-dev
 make clean && make -j$(nproc)
 rm -rf ~/.piv2/testnet5/wallet.dat ~/.piv2/testnet5/database
 ```
+
+### Legacy Masternode System Disabled
+```
+Error: Legacy masternode system disabled. Use -mnoperatorprivatekey to start as deterministic masternode
+```
+**Fix:** Don't use `masternode=1` in config. Instead:
+1. Comment out or remove `masternode=1` from piv2.conf
+2. Start daemon normally: `./src/piv2d -testnet -daemon`
+3. Use `initmasternode` RPC command (see Masternode Setup section)
 
 ---
 

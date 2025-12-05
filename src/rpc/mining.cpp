@@ -283,18 +283,20 @@ UniValue generatebootstrap(const JSONRPCRequest& request)
         throw std::runtime_error(
             "generatebootstrap ( nblocks )\n"
             "\n[TESTNET/REGTEST ONLY] Generate bootstrap blocks for PIV2 network initialization.\n"
-            "This command generates blocks 1 and 2 (premine + ProRegTx blocks) before DMM activates.\n"
-            "Block 1 = Premine (MN collateral + Dev wallet + Faucet)\n"
-            "Block 2 = Empty block (for ProRegTx to be included)\n"
+            "\nBlock 1 = Premine (MN collateral + Dev wallet + Faucet)\n"
+            "Block 2 = REQUIRES 3 ProRegTx in mempool (MN registration)\n"
             "Block 3+ = DMM active (masternodes produce blocks)\n"
+            "\nWorkflow:\n"
+            "  1. generatebootstrap 1     -> Generate block 1 (premine)\n"
+            "  2. protx register (x3)     -> Register 3 MNs using premine collateral\n"
+            "  3. generatebootstrap 1     -> Generate block 2 (includes ProRegTx)\n"
             "\nArguments:\n"
-            "1. nblocks      (numeric, optional, default=2) Number of bootstrap blocks to generate (max 2).\n"
+            "1. nblocks      (numeric, optional, default=1) Number of bootstrap blocks to generate.\n"
             "\nResult:\n"
             "[blockhash, ...]  (array) Array of hashes of blocks generated\n"
-            "\nExamples:\n"
-            "\nGenerate bootstrap blocks 1 and 2\n" +
-            HelpExampleCli("generatebootstrap", "") +
-            HelpExampleRpc("generatebootstrap", ""));
+            "\nExamples:\n" +
+            HelpExampleCli("generatebootstrap", "1") +
+            HelpExampleRpc("generatebootstrap", "1"));
 
     // Only allowed on testnet and regtest
     if (!Params().IsTestnet() && !Params().IsRegTestNet())
@@ -307,27 +309,46 @@ UniValue generatebootstrap(const JSONRPCRequest& request)
         nCurrentHeight = chainActive.Height();
     }
 
-    // Only allowed at genesis (height 0) - blocks 1 and 2 not yet created
+    // Only allowed at genesis (height 0) or after block 1 (height 1)
     if (nCurrentHeight > 1)
-        throw JSONRPCError(RPC_MISC_ERROR, strprintf("Bootstrap already complete. Current height: %d. Bootstrap only works at height 0 or 1.", nCurrentHeight));
+        throw JSONRPCError(RPC_MISC_ERROR, strprintf("Bootstrap already complete. Current height: %d.", nCurrentHeight));
 
-    int nGenerate = 2;  // Default: generate blocks 1 and 2
+    // Block 2 requires ProRegTx in mempool
+    if (nCurrentHeight == 1) {
+        // Count ProRegTx in mempool
+        int nProRegCount = 0;
+        {
+            LOCK(mempool.cs);
+            for (const auto& entry : mempool.mapTx) {
+                const CTransaction& tx = entry.GetTx();
+                if (tx.nType == CTransaction::TxType::PROREG) {
+                    nProRegCount++;
+                }
+            }
+        }
+
+        // Require minimum 3 ProRegTx for testnet bootstrap
+        int nRequiredMN = Params().IsTestnet() ? 3 : 1;
+        if (nProRegCount < nRequiredMN) {
+            throw JSONRPCError(RPC_MISC_ERROR, strprintf(
+                "Block 2 requires %d ProRegTx in mempool. Found: %d.\n"
+                "Register masternodes first with 'protx register' command.",
+                nRequiredMN, nProRegCount));
+        }
+
+        LogPrintf("PIV2 Bootstrap: Found %d ProRegTx in mempool, generating block 2\n", nProRegCount);
+    }
+
+    int nGenerate = 1;  // Default: generate 1 block at a time
     if (request.params.size() > 0 && !request.params[0].isNull()) {
         nGenerate = request.params[0].get_int();
-        if (nGenerate <= 0 || nGenerate > 2)
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of blocks. Max 2 for bootstrap.");
+        if (nGenerate <= 0 || nGenerate > 1)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Generate 1 block at a time during bootstrap.");
     }
 
-    // Adjust based on current height
-    if (nCurrentHeight == 1) {
-        nGenerate = 1;  // Only block 2 left to generate
-    }
-
-    // Use OP_TRUE script for bootstrap blocks (no specific destination needed)
-    // Block 1 coinbase is already defined in blockassembler.cpp with premine outputs
     CScript coinbaseScript = CScript() << OP_TRUE;
 
-    LogPrintf("PIV2 Bootstrap: Generating %d bootstrap block(s) starting from height %d\n", nGenerate, nCurrentHeight + 1);
+    LogPrintf("PIV2 Bootstrap: Generating block %d\n", nCurrentHeight + 1);
 
     return generateBlocks(nGenerate, coinbaseScript);
 }

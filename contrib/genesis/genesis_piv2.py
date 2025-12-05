@@ -40,8 +40,8 @@ NETWORKS = {
         'nVersion': 1,
     },
     'testnet': {
-        'timestamp': "PIVHU Testnet Dec 2025 - Knowledge Hedge Unit - 3 MN DMM Genesis",
-        'nTime': 1733270400,  # Dec 4, 2025 00:00:00 UTC
+        'timestamp': "PIVHU Testnet Dec 2025 - Knowledge Hedge Unit - 3 MN DMM Genesis v3",
+        'nTime': 1764892800,  # Dec 5, 2025 00:00:00 UTC (fresh timestamp for DMM bootstrap)
         'nBits': 0x1e0ffff0,  # Standard testnet difficulty
         'nVersion': 1,
     },

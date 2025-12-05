@@ -170,7 +170,7 @@ static CBlock CreatePIVHUGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t 
  */
 static CBlock CreatePIVHUTestnetGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion)
 {
-    const char* pszTimestamp = "PIVHU Testnet Dec 2025 - Knowledge Hedge Unit - 3 MN DMM Genesis";
+    const char* pszTimestamp = "PIVHU Testnet Dec 2025 - Knowledge Hedge Unit - 3 MN DMM Genesis v3";
 
     CMutableTransaction txNew;
     txNew.nVersion = 1;
@@ -568,13 +568,13 @@ public:
         //   Output 4: Faucet - 50,000,000 HU
         // Total: 100,030,000 HU
         // ═══════════════════════════════════════════════════════════════════════
-        // PIV2 Testnet Genesis - v2 keys mined 2025-12-04
-        genesis = CreatePIVHUTestnetGenesisBlock(1733270400, 575173, 0x1e0ffff0, 1);
+        // PIV2 Testnet Genesis - v3 mined 2025-12-05 with fresh timestamp for DMM bootstrap
+        genesis = CreatePIVHUTestnetGenesisBlock(1764892800, 523385, 0x1e0ffff0, 1);
         consensus.hashGenesisBlock = genesis.GetHash();
 
-        // Genesis validation - v2 keys generated 2025-12-04
-        assert(consensus.hashGenesisBlock == uint256S("0x000001a025bee548de2afe598046e04dfbffd26180207558b65104c4cc7b626d"));
-        assert(genesis.hashMerkleRoot == uint256S("0xf14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3"));
+        // Genesis validation - v3 mined 2025-12-05 by C++ MineGenesisBlock
+        assert(consensus.hashGenesisBlock == uint256S("0x00000b7a70dec14ae970c1be025fd15ff82afae417618a162a879b545025cb66"));
+        assert(genesis.hashMerkleRoot == uint256S("0x482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74"));
 
         // ═══════════════════════════════════════════════════════════════════════
         // HU Core Economic Parameters - TESTNET
@@ -672,20 +672,22 @@ public:
                 Consensus::NetworkUpgrade::ALWAYS_ACTIVE;  // KHU active from genesis
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PIV2 Genesis Masternodes - Testnet Bootstrap
+        // PIV2 Genesis Masternodes - Testnet Bootstrap v3
         // These MNs are injected at block 0 to enable DMM block production
         // without the "egg and chicken" problem of needing blocks to register MNs
         // and needing MNs to produce blocks.
         // ═══════════════════════════════════════════════════════════════════════
         // Keys generated: 2025-12-04 via regtest key derivation
-        // Coinbase txid (merkle root): f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3
+        // Genesis v3 mined: 2025-12-05 by C++ MineGenesisBlock
+        // Genesis hash: 00000b7a70dec14ae970c1be025fd15ff82afae417618a162a879b545025cb66
+        // Coinbase txid (merkle root): 482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74
         // VPS IPs: 57.131.33.151, 57.131.33.152, 57.131.33.214
         // ═══════════════════════════════════════════════════════════════════════
         consensus.genesisMNs = {
             // MN1 - VPS 57.131.33.151
             {
-                "c550f0790797e42234b8e9b318a28b8a508f2cf70cdf1b4e60c7d4fdb33787df",  // proTxHash (synthetic: sha256(genesis_hash + 0))
-                "f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3",  // collateralTxHash (genesis coinbase)
+                "3ad46ebd38a363ecf2870e80c33d9544fdb6ef88f8accdd9f9b8a9b4825824d8",  // proTxHash (synthetic: sha256(sha256("genesis_mn_0_" + genesis_hash)))
+                "482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74",  // collateralTxHash (genesis coinbase)
                 0,  // collateralIndex (output 0)
                 "87060609b12d797fd2396629957fde4a3d3adbff",  // ownerKeyID
                 "02841677a39503313fb368490d1e817ee46ce78de803ef26cc684f773bfe510730",  // operatorPubKey
@@ -695,8 +697,8 @@ public:
             },
             // MN2 - VPS 57.131.33.152
             {
-                "a838b47c0d8f70e356bcdffe7b11d52fa73969aa729f4122cb77c29ef66b201f",  // proTxHash (synthetic: sha256(genesis_hash + 1))
-                "f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3",  // collateralTxHash (genesis coinbase)
+                "a0b733c1c804a1afc171f1994a72e2202183fab854dbf05c7e84072cf06d7d8d",  // proTxHash (synthetic: sha256(sha256("genesis_mn_1_" + genesis_hash)))
+                "482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74",  // collateralTxHash (genesis coinbase)
                 1,  // collateralIndex (output 1)
                 "2563dfb22c186e7d2741ed6d785856f7f17e187a",  // ownerKeyID
                 "0252578510b38f3cd4f520faab8ccfe2703f0a21498cc7071a2f1d3483209eb8a1",  // operatorPubKey
@@ -706,8 +708,8 @@ public:
             },
             // MN3 - VPS 57.131.33.214
             {
-                "1176beec1bafbedbb07da904e3b45aca466efc3eaae7edd68753a816187e0987",  // proTxHash (synthetic: sha256(genesis_hash + 2))
-                "f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3",  // collateralTxHash (genesis coinbase)
+                "1052ddb976fdc6b3839fded3eb7f253911560779c991cba65a30f40242ffddb9",  // proTxHash (synthetic: sha256(sha256("genesis_mn_2_" + genesis_hash)))
+                "482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74",  // collateralTxHash (genesis coinbase)
                 2,  // collateralIndex (output 2)
                 "dd2ba22aec7280230ff03da61b7141d7acf12edd",  // ownerKeyID
                 "03c354dd0ded289836371337ffe18f4b8d3c06f009858e68d49705ba3e6b67c25c",  // operatorPubKey

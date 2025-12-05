@@ -148,6 +148,11 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     { "waitfornewblock", 0, "timeout" },
     { "walletpassphrase", 1, "timeout" },
     { "mnconnect", 1, "mn_list" },
+    // ProTx commands (DMN)
+    { "protx_register", 1, "collateralIndex" },
+    { "protx_register_prepare", 1, "collateralIndex" },
+    // Bootstrap commands
+    { "generatebootstrap", 0, "nblocks" },
     // Echo with conversion (For testing only)
     { "echojson", 0, "arg0" },
     { "echojson", 1, "arg1" },

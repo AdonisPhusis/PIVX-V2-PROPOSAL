@@ -5,6 +5,7 @@
 #include "blocksignature.h"
 
 #include "chainparams.h"
+#include "evo/deterministicmns.h"
 #include "validation.h"
 
 bool SignBlockWithKey(CBlock& block, const CKey& key)
@@ -27,12 +28,19 @@ bool CheckBlockSignature(const CBlock& block)
         return true;
     }
 
-    // Bootstrap phase: Blocks 1 and 2 exempt (no MNs active yet)
+    // Bootstrap phase: Exempt until we have registered MNs
+    // DMM activation happens AFTER the block containing the first 3 ProRegTx
+    // So all blocks during bootstrap (before MN list has 3+ entries) are exempt
     {
         LOCK(cs_main);
         auto it = mapBlockIndex.find(block.hashPrevBlock);
-        if (it != mapBlockIndex.end() && it->second->nHeight < 2) {
-            return true;
+        if (it != mapBlockIndex.end()) {
+            // Check if we have enough registered MNs at the parent block
+            auto mnList = deterministicMNManager->GetListAtChainTip();
+            // If less than 3 MNs, we're still in bootstrap phase
+            if (mnList.GetAllMNsCount() < 3) {
+                return true;
+            }
         }
     }
 

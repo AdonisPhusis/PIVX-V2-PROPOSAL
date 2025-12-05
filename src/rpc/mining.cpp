@@ -283,13 +283,15 @@ UniValue generatebootstrap(const JSONRPCRequest& request)
         throw std::runtime_error(
             "generatebootstrap ( nblocks )\n"
             "\n[TESTNET/REGTEST ONLY] Generate bootstrap blocks for PIV2 network initialization.\n"
-            "\nBlock 1 = Premine (MN collateral + Dev wallet + Faucet)\n"
-            "Block 2 = REQUIRES 3 ProRegTx in mempool (MN registration)\n"
-            "Block 3+ = DMM active (masternodes produce blocks)\n"
+            "\nBlock 1 = Premine (Dev wallet + Faucet)\n"
+            "Block 2+ = Intermediate blocks (confirm collateral transactions)\n"
+            "Final = DMM activation block (REQUIRES 3 ProRegTx in mempool)\n"
             "\nWorkflow:\n"
             "  1. generatebootstrap 1     -> Generate block 1 (premine)\n"
-            "  2. protx register (x3)     -> Register 3 MNs using premine collateral\n"
-            "  3. generatebootstrap 1     -> Generate block 2 (includes ProRegTx)\n"
+            "  2. sendmany to create collaterals\n"
+            "  3. generatebootstrap 1     -> Generate block 2 (confirm collaterals)\n"
+            "  4. protx register (x3)     -> Register 3 MNs\n"
+            "  5. generatebootstrap 1     -> Generate block 3 (DMM activation)\n"
             "\nArguments:\n"
             "1. nblocks      (numeric, optional, default=1) Number of bootstrap blocks to generate.\n"
             "\nResult:\n"
@@ -309,34 +311,33 @@ UniValue generatebootstrap(const JSONRPCRequest& request)
         nCurrentHeight = chainActive.Height();
     }
 
-    // Only allowed at genesis (height 0) or after block 1 (height 1)
-    if (nCurrentHeight > 1)
-        throw JSONRPCError(RPC_MISC_ERROR, strprintf("Bootstrap already complete. Current height: %d.", nCurrentHeight));
+    // Bootstrap phases:
+    // Block 1: Premine (Dev + Faucet)
+    // Block 2+: Intermediate blocks (confirm collateral transactions)
+    // Final bootstrap block: Must include 3 ProRegTx
 
-    // Block 2 requires ProRegTx in mempool
-    if (nCurrentHeight == 1) {
-        // Count ProRegTx in mempool
-        int nProRegCount = 0;
-        {
-            LOCK(mempool.cs);
-            for (const auto& entry : mempool.mapTx) {
-                const CTransaction& tx = entry.GetTx();
-                if (tx.nType == CTransaction::TxType::PROREG) {
-                    nProRegCount++;
-                }
+    // Count ProRegTx in mempool
+    int nProRegCount = 0;
+    {
+        LOCK(mempool.cs);
+        for (const auto& entry : mempool.mapTx) {
+            const CTransaction& tx = entry.GetTx();
+            if (tx.nType == CTransaction::TxType::PROREG) {
+                nProRegCount++;
             }
         }
+    }
 
-        // Require minimum 3 ProRegTx for testnet bootstrap
-        int nRequiredMN = Params().IsTestnet() ? 3 : 1;
-        if (nProRegCount < nRequiredMN) {
-            throw JSONRPCError(RPC_MISC_ERROR, strprintf(
-                "Block 2 requires %d ProRegTx in mempool. Found: %d.\n"
-                "Register masternodes first with 'protx register' command.",
-                nRequiredMN, nProRegCount));
-        }
+    // Require minimum 3 ProRegTx to complete bootstrap (DMM activation)
+    int nRequiredMN = Params().IsTestnet() ? 3 : 1;
 
-        LogPrintf("PIV2 Bootstrap: Found %d ProRegTx in mempool, generating block 2\n", nProRegCount);
+    // If we have 3+ ProRegTx, this will be the final bootstrap block
+    if (nProRegCount >= nRequiredMN) {
+        LogPrintf("PIV2 Bootstrap: Found %d ProRegTx in mempool, generating DMM activation block at height %d\n", nProRegCount, nCurrentHeight + 1);
+    } else if (nCurrentHeight >= 1) {
+        // Allow intermediate blocks to confirm collateral transactions
+        LogPrintf("PIV2 Bootstrap: Generating intermediate block at height %d (ProRegTx: %d/%d)\n",
+                  nCurrentHeight + 1, nProRegCount, nRequiredMN);
     }
 
     int nGenerate = 1;  // Default: generate 1 block at a time

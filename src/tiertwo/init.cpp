@@ -208,39 +208,22 @@ bool InitActiveMN()
         const bool fDeterministic = !mnoperatorkeyStr.empty();
         LogPrintf("IS %s MASTERNODE\n", (fDeterministic ? "DETERMINISTIC " : ""));
 
-        if (fDeterministic) {
-            // Check enforcement
-            if (!deterministicMNManager->IsDIP3Enforced()) {
-                const std::string strError = strprintf(
-                        _("Cannot start deterministic masternode before enforcement. Remove %s to start as legacy masternode"),
-                        "-mnoperatorprivatekey");
-                LogPrintf("-- ERROR: %s\n", strError);
-                return UIError(strError);
-            }
-            // Create and register activeMasternodeManager
-            activeMasternodeManager = new CActiveDeterministicMasternodeManager();
-            auto res = activeMasternodeManager->SetOperatorKey(mnoperatorkeyStr);
-            if (!res) { return UIError(res.getError()); }
-            // Register validation interface for UpdatedBlockTip notifications
-            RegisterValidationInterface(activeMasternodeManager);
-            // Init active masternode
-            const CBlockIndex* pindexTip = WITH_LOCK(cs_main, return chainActive.Tip(););
-            activeMasternodeManager->Init(pindexTip);
-            if (activeMasternodeManager->GetState() == CActiveDeterministicMasternodeManager::MASTERNODE_ERROR) {
-                return UIError(activeMasternodeManager->GetStatus()); // state logged internally
-            }
-        } else {
-            // Check enforcement
-            if (deterministicMNManager->LegacyMNObsolete()) {
-                const std::string strError = strprintf(
-                        _("Legacy masternode system disabled. Use %s to start as deterministic masternode"),
-                        "-mnoperatorprivatekey");
-                LogPrintf("-- ERROR: %s\n", strError);
-                return UIError(strError);
-            }
-            auto res = initMasternode(gArgs.GetArg("-masternodeprivkey", ""), gArgs.GetArg("-masternodeaddr", ""),
-                                      true);
-            if (!res) { return UIError(res.getError()); }
+        if (!fDeterministic) {
+            return UIError(_("Masternode requires -mnoperatorprivatekey (DMN only)"));
+        }
+
+        if (!deterministicMNManager->IsDIP3Enforced()) {
+            return UIError(_("Cannot start deterministic masternode before DIP3 enforcement"));
+        }
+
+        activeMasternodeManager = new CActiveDeterministicMasternodeManager();
+        auto res = activeMasternodeManager->SetOperatorKey(mnoperatorkeyStr);
+        if (!res) { return UIError(res.getError()); }
+        RegisterValidationInterface(activeMasternodeManager);
+        const CBlockIndex* pindexTip = WITH_LOCK(cs_main, return chainActive.Tip(););
+        activeMasternodeManager->Init(pindexTip);
+        if (activeMasternodeManager->GetState() == CActiveDeterministicMasternodeManager::MASTERNODE_ERROR) {
+            return UIError(activeMasternodeManager->GetStatus());
         }
     }
 

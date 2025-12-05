@@ -21,10 +21,8 @@
 static const unsigned int CACHED_BLOCK_HASHES = 200;
 
 class CMasternodeMan;
-class CActiveMasternode;
 
 extern CMasternodeMan mnodeman;
-extern CActiveMasternode activeMasternode;
 
 void DumpMasternodes();
 

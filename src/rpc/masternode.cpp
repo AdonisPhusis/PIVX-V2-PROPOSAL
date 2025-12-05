@@ -47,19 +47,7 @@ UniValue mnping(const JSONRPCRequest& request)
             HelpExampleCli("mnping", "") + HelpExampleRpc("mnping", ""));
     }
 
-    if (!Params().IsRegTestNet()) {
-        throw JSONRPCError(RPC_MISC_ERROR, "command available only for RegTest network");
-    }
-
-    if (!fMasterNode) {
-        throw JSONRPCError(RPC_MISC_ERROR, "this is not a masternode");
-    }
-
-    UniValue ret(UniValue::VOBJ);
-    std::string strError;
-    ret.pushKV("sent", activeMasternode.SendMasternodePing(strError) ?
-                       "YES" : strprintf("NO (%s)", strError));
-    return ret;
+    throw JSONRPCError(RPC_MISC_ERROR, "mnping is deprecated - DMN uses HUSIG quorum signaling");
 }
 
 UniValue initmasternode(const JSONRPCRequest& request)

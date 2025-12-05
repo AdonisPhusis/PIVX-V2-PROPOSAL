@@ -23,10 +23,7 @@
 
 #define MN_WINNER_MINIMUM_AGE 8000    // Age in seconds. This should be > MASTERNODE_REMOVAL_SECONDS to avoid misconfigured new nodes in the list.
 
-/** Masternode manager */
 CMasternodeMan mnodeman;
-/** Keep track of the active Masternode */
-CActiveMasternode activeMasternode;
 
 struct CompareScoreMN {
     template <typename T>
@@ -837,11 +834,6 @@ int CMasternodeMan::ProcessMNBroadcast(CNode* pfrom, CMasternodeBroadcast& mnb)
         return 0;
     }
 
-    // if it matches our MN pubkey, then we've been remotely activated
-    if (mnb.pubKeyMasternode == activeMasternode.pubKeyMasternode && mnb.protocolVersion == PROTOCOL_VERSION) {
-        activeMasternode.EnableHotColdMasterNode(mnb.vin, mnb.addr);
-    }
-
     // Relay only if we are synchronized and if the mnb address is not local.
     // Makes no sense to relay MNBs to the peers from where we are syncing them.
     bool isLocal = (mnb.addr.IsRFC1918() || mnb.addr.IsLocal()) && !Params().IsRegTestNet();
@@ -1191,11 +1183,6 @@ void ThreadCheckMasternodes()
 
             if (g_tiertwo_sync_state.IsBlockchainSynced()) {
                 c++;
-
-                // check if we should activate or ping every few minutes,
-                // start right after sync is considered to be done
-                if (c % (MasternodePingSeconds()/2) == 0)
-                    activeMasternode.ManageStatus();
 
                 if (c % (MasternodePingSeconds()/5) == 0) {
                     masternodePayments.CleanPaymentList(mnodeman.CheckAndRemove(), mnodeman.GetBestHeight());

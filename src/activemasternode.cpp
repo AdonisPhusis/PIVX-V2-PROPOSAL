@@ -334,10 +334,18 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
         return false;
     }
 
-    // Only genesis block exempt from sync check
-    bool isGenesis = (pindexPrev->nHeight < 1);
+    // PIV2: Bootstrap phase - first 10 blocks exempt from sync check
+    // This allows the network to bootstrap without the chicken-and-egg problem
+    // where sync requires blocks but blocks require sync
+    bool isBootstrapPhase = (pindexPrev->nHeight < 10);
 
-    if (!isGenesis && !g_tiertwo_sync_state.IsBlockchainSynced()) {
+    if (!isBootstrapPhase && !g_tiertwo_sync_state.IsBlockchainSynced()) {
+        static int64_t nLastSyncWarnTime = 0;
+        int64_t nNow = GetTime();
+        if (nNow - nLastSyncWarnTime > 30) {
+            LogPrintf("DMM-SCHEDULER: Waiting for blockchain sync (height=%d)\n", pindexPrev->nHeight);
+            nLastSyncWarnTime = nNow;
+        }
         return false;
     }
 

@@ -8,15 +8,31 @@
 
 TierTwoSyncState g_tiertwo_sync_state;
 
+// Bootstrap height: blocks 0-5 are exempt from HU quorum requirement
+// Block 0: Genesis
+// Block 1: Premine
+// Block 2: Collateral tx confirmation
+// Blocks 3-5: ProRegTx (3 MNs)
+// Block 6+: DMM active, requires HU quorum
+static const int PIV2_BOOTSTRAP_HEIGHT = 5;
+
 /**
  * PIV2: Simplified sync check based on HU finality
  *
- * Synced if we received a finalized block (with HU quorum) in the last 60 seconds.
- * No bootstrap phase - quorum required from block 1.
+ * During bootstrap (height <= 5): Always synced
+ * After bootstrap: Synced if we received a finalized block (with HU quorum) in the last 60 seconds.
  */
 bool TierTwoSyncState::IsBlockchainSynced() const
 {
-    // Check if we received a finalized block recently
+    int chainHeight = m_chain_height.load();
+
+    // Bootstrap phase: blocks 0-5 are always considered synced
+    // This allows DMM to start producing block 6 without waiting for HU signatures
+    if (chainHeight <= PIV2_BOOTSTRAP_HEIGHT) {
+        return true;
+    }
+
+    // After bootstrap: check if we received a finalized block recently
     int64_t lastFinalized = m_last_finalized_time.load();
     int64_t now = GetTime();
 

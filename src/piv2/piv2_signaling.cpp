@@ -369,6 +369,9 @@ void NotifyBlockConnected(const CBlockIndex* pindex, CConnman* connman)
     huSignalingManager->Cleanup(pindex->nHeight);
 }
 
+// Bootstrap height constant - same as in tiertwo_sync_state.cpp
+static const int PIV2_BOOTSTRAP_HEIGHT = 5;
+
 bool PreviousBlockHasQuorum(const CBlockIndex* pindexPrev)
 {
     if (!pindexPrev) {
@@ -378,15 +381,16 @@ bool PreviousBlockHasQuorum(const CBlockIndex* pindexPrev)
     const Consensus::Params& consensus = Params().GetConsensus();
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // PIV2 Bootstrap Exception: Blocks 0, 1, 2 exempt from quorum
+    // PIV2 Bootstrap Exception: Blocks 0-5 exempt from quorum
     // ═══════════════════════════════════════════════════════════════════════════
     // Block 0 (Genesis): No MNs exist yet (empty coinbase)
     // Block 1 (Premine): Spendable UTXO created (MN collateral + Dev + Faucet)
-    // Block 2 (ProRegTx): MNs register with real collateral from Block 1
-    // Block 3+: Requires quorum (2/3 signatures) on previous block
+    // Block 2 (Collaterals): Collateral tx confirmation
+    // Blocks 3-5 (ProRegTx): MNs register with real collateral
+    // Block 6+: DMM active, requires quorum (2/3 signatures) on previous block
     // ═══════════════════════════════════════════════════════════════════════════
-    if (pindexPrev->nHeight < 3) {
-        return true;  // Blocks 0, 1, 2 exempt - MNs not yet active
+    if (pindexPrev->nHeight <= PIV2_BOOTSTRAP_HEIGHT) {
+        return true;  // Bootstrap blocks exempt - no HU signatures yet
     }
 
     // Check if previous block has quorum

@@ -228,8 +228,18 @@ void CActiveDeterministicMasternodeManager::UpdatedBlockTip(const CBlockIndex* p
     LogPrintf("%s: height=%d, fInitialDownload=%d, fMasterNode=%d, state=%d\n",
               __func__, pindexNew->nHeight, fInitialDownload, fMasterNode, state);
 
-    if (fInitialDownload)
+    // PIV2 DMM Bootstrap: Allow MN initialization during bootstrap phase (first 10 blocks)
+    // At genesis, fInitialDownload is true because there are no recent blocks.
+    // Genesis MNs need to initialize and produce blocks to exit this state.
+    bool isBootstrapPhase = (pindexNew->nHeight < 10);
+
+    if (fInitialDownload && !isBootstrapPhase)
         return;
+
+    if (fInitialDownload && isBootstrapPhase) {
+        LogPrintf("%s: Bootstrap phase detected (height=%d), allowing MN initialization despite fInitialDownload=true\n",
+                  __func__, pindexNew->nHeight);
+    }
 
     if (!fMasterNode || !deterministicMNManager->IsDIP3Enforced(pindexNew->nHeight))
         return;
@@ -329,9 +339,19 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
         return false;
     }
 
-    // Don't produce if initial download
-    if (!g_tiertwo_sync_state.IsBlockchainSynced()) {
+    // PIV2 DMM Bootstrap: Allow block production at genesis even if not "synced"
+    // At bootstrap, IsBlockchainSynced() returns false because there are no recent blocks.
+    // Genesis MNs (height 0) should be able to produce the first blocks.
+    bool isBootstrap = (pindexPrev->nHeight < 10);  // First 10 blocks = bootstrap phase
+
+    // Don't produce if initial download (unless bootstrap)
+    if (!isBootstrap && !g_tiertwo_sync_state.IsBlockchainSynced()) {
         return false;
+    }
+
+    if (isBootstrap) {
+        LogPrintf("DMM-SCHEDULER: Bootstrap mode active (height=%d), bypassing sync check\n",
+                  pindexPrev->nHeight);
     }
 
     // Rate limiting - prevent double production

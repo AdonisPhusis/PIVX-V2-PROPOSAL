@@ -47,6 +47,17 @@ int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParam
     int64_t nOldTime = pblock->nTime;
     int64_t nNewTime = std::max(pindexPrev->GetMedianTimePast()+1, GetAdjustedTime());
 
+    // PIV2 Time Protocol V2: Round timestamp to the nearest valid time slot (multiple of 15 seconds)
+    // This ensures the block passes the IsValidBlockTimeStamp() check in consensus/params.h
+    int nHeight = pindexPrev->nHeight + 1;
+    if (consensusParams.IsTimeProtocolV2(nHeight)) {
+        nNewTime = GetTimeSlot(nNewTime);
+        // If rounding down puts us before median time past, round up to next slot
+        if (nNewTime <= pindexPrev->GetMedianTimePast()) {
+            nNewTime += consensusParams.nTimeSlotLength;
+        }
+    }
+
     if (nOldTime < nNewTime)
         pblock->nTime = nNewTime;
 

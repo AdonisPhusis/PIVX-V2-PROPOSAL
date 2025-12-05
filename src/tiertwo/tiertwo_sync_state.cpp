@@ -36,7 +36,7 @@ bool TierTwoSyncState::IsBlockchainSynced() const
     int64_t lastFinalized = m_last_finalized_time.load();
     int64_t now = GetTime();
 
-    return (now - lastFinalized) < PIV2_SYNC_TIMEOUT;
+    return (now - lastFinalized) <= PIV2_SYNC_TIMEOUT;
 }
 
 void TierTwoSyncState::OnFinalizedBlock(int height, int64_t timestamp)

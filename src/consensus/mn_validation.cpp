@@ -6,6 +6,7 @@
 
 #include "activemasternode.h"
 #include "chain.h"
+#include "chainparams.h"
 #include "consensus/validation.h"
 #include "evo/blockproducer.h"
 #include "evo/deterministicmns.h"
@@ -30,13 +31,23 @@ bool CheckBlockMNOnly(const CBlock& block,
     }
 
     CDeterministicMNList mnList = deterministicMNManager->GetListForBlock(pindexPrev);
+    const int nHeight = pindexPrev->nHeight + 1;
+
+    // Bootstrap exemption: Allow unsigned blocks during initial network setup
+    // Blocks 1-5 are generated via generatebootstrap before MNs are online
+    // After block 5, DMM signature verification is strictly enforced
+    if (Params().IsTestnet() && nHeight <= 5) {
+        LogPrint(BCLog::MASTERNODE, "%s: Bootstrap block %d - MN signature not required\n",
+                 __func__, nHeight);
+        return true;
+    }
 
     // Before any MN is confirmed, allow blocks without producer signature
     // MNs need at least 1 confirmation after registration to be "confirmed"
     size_t confirmedCount = mnList.GetConfirmedMNsCount();
     if (confirmedCount == 0) {
         LogPrint(BCLog::MASTERNODE, "%s: No confirmed MNs at height %d (total: %d), allowing block\n",
-                 __func__, pindexPrev->nHeight + 1, mnList.GetValidMNsCount());
+                 __func__, nHeight, mnList.GetValidMNsCount());
         return true;
     }
 

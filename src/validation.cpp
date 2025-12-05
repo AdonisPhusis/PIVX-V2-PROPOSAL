@@ -839,10 +839,11 @@ CAmount GetBlockValue(int nHeight)
     // TESTNET/REGTEST: Block 1 premine simulates snapshot import
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Block 1 Premine (Testnet): 100,030,000 PIV2
-    // Simulates snapshot import - creates spendable UTXO at block 1
+    // Block 1 Premine (Testnet): 530,000 PIV2
+    // 500K Dev + 3×10K collaterals = 530,000 PIV2
+    // Genesis MNs don't need ProRegTx, so no fee outputs needed
     if (nHeight == 1 && Params().IsTestnet()) {
-        return 100030000 * COIN;  // 3×10K MN + 50M Dev + 50M Faucet
+        return 530000 * COIN;
     }
 
     // Block 1 Premine (Regtest): 50,030,300 PIV2
@@ -2851,13 +2852,22 @@ bool CheckBlockTime(const CBlockHeader& block, CValidationState& state, CBlockIn
     const int64_t blockTime = block.GetBlockTime();
     const int blockHeight = pindexPrev->nHeight + 1;
 
+    // PIV2: Relax time checks during bootstrap phase (blocks 1-5)
+    // During bootstrap, blocks are generated rapidly via generatebootstrap RPC.
+    // DMM takes over timing enforcement after bootstrap is complete.
+    if (Params().IsTestnet() && blockHeight <= 5) {
+        // Only enforce basic time slot alignment during bootstrap
+        if (!Params().GetConsensus().IsValidBlockTimeStamp(blockTime, blockHeight))
+            return state.DoS(100, error("%s : block timestamp mask not valid", __func__), REJECT_INVALID, "invalid-time-mask");
+        return true;
+    }
+
     // Check blocktime against future drift (WANT: blk_time <= Now + MaxDrift)
     if (blockTime > pindexPrev->MaxFutureBlockTime())
         return state.Invalid(error("%s : block timestamp too far in the future", __func__), REJECT_INVALID, "time-too-new");
 
-    // Check blocktime against prev (WANT: blk_time > MinPastBlockTime)
-    if (blockTime <= pindexPrev->MinPastBlockTime())
-        return state.DoS(50, error("%s : block timestamp too old", __func__), REJECT_INVALID, "time-too-old");
+    // PIV2: Removed "time-too-old" check - DMM produces blocks at fixed intervals
+    // The legacy check (blockTime > MinPastBlockTime) is not applicable to DMM consensus
 
     // Check blocktime mask
     if (!Params().GetConsensus().IsValidBlockTimeStamp(blockTime, blockHeight))

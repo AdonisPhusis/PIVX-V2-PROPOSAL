@@ -9,6 +9,7 @@
 #include "coins.h"
 #include "chainparams.h"
 #include "consensus/params.h"  // For Consensus::GenesisMN
+#include "hash.h"              // For CHashWriter
 #include "consensus/upgrades.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -30,8 +31,14 @@ std::unique_ptr<CDeterministicMNManager> deterministicMNManager;
 
 /**
  * PIV2: Inject genesis masternodes into DMN list at block 0.
- * This enables DMM block production without the "egg and chicken" problem
- * of needing blocks to register MNs and needing MNs to produce blocks.
+ * Like ETH2/Cosmos, genesis MNs are defined in the initial consensus state.
+ * This enables DMM block production without the "egg and chicken" problem.
+ *
+ * Genesis MNs:
+ * - Are defined by (ownerAddress, operatorPubKey, payoutAddress)
+ * - No IP in consensus: MNs announce their IP via P2P after launch
+ * - No ProRegTx needed: their legitimacy comes from being in genesis state
+ * - Collateral (10k) is created at block 1 premine to owner addresses
  */
 static void InjectGenesisMasternodes(CDeterministicMNList& mnList, const uint256& blockHash)
 {
@@ -53,46 +60,60 @@ static void InjectGenesisMasternodes(CDeterministicMNList& mnList, const uint256
             state->nPoSeRevivedHeight = -1;
             state->nPoSeBanHeight = -1;
 
-            // Parse owner key ID (20 bytes hex)
-            std::vector<unsigned char> ownerKeyIDBytes = ParseHex(genesisMN.ownerKeyID);
-            if (ownerKeyIDBytes.size() == 20) {
-                state->keyIDOwner = CKeyID(uint160(ownerKeyIDBytes));
+            // Decode owner address to get keyID
+            CTxDestination ownerDest = DecodeDestination(genesisMN.ownerAddress);
+            const CKeyID* ownerKeyID = boost::get<CKeyID>(&ownerDest);
+            if (ownerKeyID) {
+                state->keyIDOwner = *ownerKeyID;
+                state->keyIDVoting = *ownerKeyID;  // Voting = Owner for genesis MNs
+            } else {
+                LogPrintf("DMN: ERROR - invalid owner address for genesis MN %d: %s\n",
+                          internalId, genesisMN.ownerAddress);
+                continue;
             }
 
             // Parse operator pubkey (33 bytes compressed ECDSA)
             std::vector<unsigned char> operatorPubKeyBytes = ParseHex(genesisMN.operatorPubKey);
             if (operatorPubKeyBytes.size() == 33) {
                 state->pubKeyOperator = CPubKey(operatorPubKeyBytes.begin(), operatorPubKeyBytes.end());
+            } else {
+                LogPrintf("DMN: ERROR - invalid operator pubkey for genesis MN %d\n", internalId);
+                continue;
             }
 
-            // Parse voting key ID (20 bytes hex)
-            std::vector<unsigned char> votingKeyIDBytes = ParseHex(genesisMN.votingKeyID);
-            if (votingKeyIDBytes.size() == 20) {
-                state->keyIDVoting = CKeyID(uint160(votingKeyIDBytes));
-            }
+            // Decode payout address to script
+            CTxDestination payoutDest = DecodeDestination(genesisMN.payoutAddress);
+            state->scriptPayout = GetScriptForDestination(payoutDest);
 
-            // Parse service address
-            Lookup(genesisMN.serviceAddr.c_str(), state->addr, 0, false);
+            // No IP address - MN will announce via P2P after launch
+            // state->addr remains empty/unset
 
-            // Parse payout script
-            std::vector<unsigned char> payoutScriptBytes = ParseHex(genesisMN.payoutAddress);
-            state->scriptPayout = CScript(payoutScriptBytes.begin(), payoutScriptBytes.end());
+            // Generate synthetic proTxHash from genesis block hash + MN index
+            // This provides a unique, deterministic identifier for each genesis MN
+            CHashWriter hw(SER_GETHASH, 0);
+            hw << blockHash;
+            hw << internalId;
+            uint256 syntheticProTxHash = hw.GetHash();
 
-            // Set confirmed hash to genesis block hash (immediately confirmed)
-            state->UpdateConfirmedHash(uint256S(genesisMN.proTxHash), blockHash);
+            // Set confirmed hash immediately (genesis MNs are pre-confirmed)
+            state->UpdateConfirmedHash(syntheticProTxHash, blockHash);
 
             // Create DMN entry
             auto dmn = std::make_shared<CDeterministicMN>(internalId);
-            dmn->proTxHash = uint256S(genesisMN.proTxHash);
-            dmn->collateralOutpoint = COutPoint(uint256S(genesisMN.collateralTxHash), genesisMN.collateralIndex);
+            dmn->proTxHash = syntheticProTxHash;
+            // Genesis MNs use a synthetic collateral outpoint based on genesis block hash
+            // The real collateral (10k PIV2) is created at block 1 premine
+            // This synthetic outpoint ensures unique property constraints are satisfied
+            dmn->collateralOutpoint = COutPoint(blockHash, internalId);
             dmn->nOperatorReward = 0;  // No operator reward for genesis MNs
             dmn->pdmnState = state;
 
             // Add to list
             mnList.AddMN(dmn, true);
 
-            LogPrintf("DMN: Added genesis MN %d: proTxHash=%s, service=%s\n",
-                      internalId, dmn->proTxHash.ToString(), state->addr.ToStringIPPort());
+            LogPrintf("DMN: Added genesis MN %d: proTxHash=%s, owner=%s, operator=%s\n",
+                      internalId, syntheticProTxHash.ToString().substr(0, 16),
+                      genesisMN.ownerAddress, genesisMN.operatorPubKey.substr(0, 16));
         } catch (const std::exception& e) {
             LogPrintf("DMN: ERROR adding genesis MN %d: %s\n", internalId, e.what());
         }

@@ -7,6 +7,8 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "logging.h"
+#include "tiertwo/tiertwo_sync_state.h"
+#include "utiltime.h"
 #include "validation.h"
 
 #include <boost/filesystem.hpp>
@@ -201,12 +203,29 @@ bool CHuFinalityHandler::AddSignature(const CHuSignature& sig)
 
     // Check if we just reached finality
     if (static_cast<int>(finality.mapSignatures.size()) == nThreshold) {
-        LogPrintf("HU Finality: Block %s reached finality (%d signatures)\n",
-                  sig.blockHash.ToString().substr(0, 16), nThreshold);
+        // Get block height from mapBlockIndex if not set
+        int nHeight = finality.nHeight;
+        if (nHeight <= 0) {
+            LOCK(cs_main);
+            auto it = mapBlockIndex.find(sig.blockHash);
+            if (it != mapBlockIndex.end()) {
+                nHeight = it->second->nHeight;
+                finality.nHeight = nHeight;
+            }
+        }
+
+        LogPrintf("HU Finality: Block %s at height %d reached finality (%d signatures)\n",
+                  sig.blockHash.ToString().substr(0, 16), nHeight, nThreshold);
 
         // Update height->block mapping if we have the height
-        if (finality.nHeight > 0) {
-            mapHeightToBlock[finality.nHeight] = sig.blockHash;
+        if (nHeight > 0) {
+            mapHeightToBlock[nHeight] = sig.blockHash;
+
+            // PIV2: Notify sync state that we have a finalized block
+            // This is critical for DMM to know it can produce the next block
+            g_tiertwo_sync_state.OnFinalizedBlock(nHeight, GetTime());
+            LogPrint(BCLog::HU, "HU Finality: Notified sync state of finalized block at height %d\n",
+                     nHeight);
         }
     }
 

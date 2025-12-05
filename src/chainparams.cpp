@@ -647,15 +647,34 @@ public:
                 Consensus::NetworkUpgrade::ALWAYS_ACTIVE;  // KHU active from genesis
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PIV2 Genesis Masternodes - REMOVED (v5)
+        // PIV2 Genesis Masternodes (Testnet)
         // ═══════════════════════════════════════════════════════════════════════
-        // No virtual MNs at genesis. Block 1 is a special bootstrap block that:
-        // 1. Can be produced without MN (exception)
-        // 2. Contains premine coinbase with MN collateral UTXO
-        // 3. Contains ProRegTx to register MNs with real collateral
-        // After block 1, DMM requires registered MNs with quorum.
+        // Like ETH2/Cosmos, genesis MNs are defined in the initial consensus state.
+        // - No ProRegTx needed for these 3 MNs
+        // - Collateral (10k each) created at block 1 premine to owner addresses
+        // - IP announced via P2P after MN starts (not in consensus)
+        // - New MNs after launch must use ProRegTx
         // ═══════════════════════════════════════════════════════════════════════
-        consensus.genesisMNs = {};  // Empty - MNs registered at block 1
+        consensus.genesisMNs = {
+            // MN1: VPS 57.131.33.151
+            {
+                "y7L1LfAfdSbMCu9qvvEYd9LHq97FqUPeaM",  // ownerAddress (receives 10k collateral)
+                "02f3ae14dee0a4ba9b1ce436e0cd8e2e30890b509fda174a7d623a39e9bc4acf0d",  // operatorPubKey
+                "y5AxLQc6Wm9GiNs7mNxs1eZJdGtZTFrpnG"   // payoutAddress
+            },
+            // MN2: VPS 57.131.33.152
+            {
+                "yA3MEDZbpDaPPTUqid6AxAbHd7rjiWvWaN",  // ownerAddress
+                "02a7534aa0965e5385c902366c1888869896e7a09b94c4cf36ad1012956517c1e0",  // operatorPubKey
+                "yJWrx8WkfQ9idqYEWUCvgQDVygGMmQQVC1"   // payoutAddress
+            },
+            // MN3: VPS 57.131.33.214
+            {
+                "yAi9Rhh4W7e7SnQ5FkdL2bDS5dDDSLiK9r",  // ownerAddress
+                "0312f12f5f4a3d6751de0e651820892a38a3d9f4b0360195b91c5e5490c05f9f5d",  // operatorPubKey
+                "xzGBAK1kpGxpnASP6VQy1Bvwr7i5spWybJ"   // payoutAddress
+            }
+        };
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.

@@ -20,7 +20,9 @@ class uint256;  // Forward declaration for legacy functions
 // PIV2: Sync is based on receiving finalized blocks (HU quorum)
 // No bootstrap phase - quorum required from block 1
 // Sync timeout: consider synced if we received a finalized block in last 60 seconds
-#define PIV2_SYNC_TIMEOUT 60
+// PIV2: Sync timeout must be longer than DMM block interval (60s) to avoid race conditions
+// Using 120s gives at least two block production opportunities per finality event
+#define PIV2_SYNC_TIMEOUT 120
 
 class TierTwoSyncState {
 public:

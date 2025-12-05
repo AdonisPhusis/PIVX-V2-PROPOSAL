@@ -97,30 +97,38 @@ CMutableTransaction CreateCoinbaseTx(const CScript& scriptPubKeyIn, CBlockIndex*
 
         if (Params().IsTestnet()) {
             // ═══════════════════════════════════════════════════════════════════════════
-            // TESTNET Block 1 Distribution: 100,000,000 PIV2
+            // TESTNET Block 1 Distribution: 530,000 PIV2
             // ═══════════════════════════════════════════════════════════════════════════
-            // Output 0: Dev Wallet (50M) - For MN collaterals via protx_register_fund
-            // Output 1: Faucet (50M)
+            // Like ETH2/Cosmos, genesis MN collaterals are created at block 1.
+            // No ProRegTx needed - genesis MNs are defined in consensus params.
             //
-            // MN Collaterals are created via protx_register_fund which:
-            // 1. Creates a 10K output for collateral
-            // 2. References it internally (collateralHash = 0x00...00)
-            // 3. No conflict between collateral reference and fee inputs
-            //
-            // For MAINNET: This will be replaced with snapshot distribution
+            // Output 0: Dev Wallet (500,000 PIV2) - for operations
+            // Output 1: MN1 Collateral (10,000 PIV2) - y7L1LfAfdSbMCu9qvvEYd9LHq97FqUPeaM
+            // Output 2: MN2 Collateral (10,000 PIV2) - yA3MEDZbpDaPPTUqid6AxAbHd7rjiWvWaN
+            // Output 3: MN3 Collateral (10,000 PIV2) - yAi9Rhh4W7e7SnQ5FkdL2bDS5dDDSLiK9r
             // ═══════════════════════════════════════════════════════════════════════════
-            txCoinbase.vout.resize(2);
+            txCoinbase.vout.resize(4);
 
-            // Dev Wallet - 50,000,000 PIV2 (xyJcTVuZwBst9oxwjCDmYmF5JKtyuKuM4v)
-            // Used for: MN collaterals (via protx_register_fund), operations, development
-            txCoinbase.vout[0].nValue = 50000000 * COIN;
+            // Dev Wallet - 500,000 PIV2 (xyJcTVuZwBst9oxwjCDmYmF5JKtyuKuM4v)
+            txCoinbase.vout[0].nValue = 500000 * COIN;
             txCoinbase.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("197cf6a11f4214b4028389c77b90f27bc90dc839") << OP_EQUALVERIFY << OP_CHECKSIG;
 
-            // Faucet - 50,000,000 PIV2 (yXfuJvqzwQBHMaL3f3brrJiFBNdUHCv78F)
-            txCoinbase.vout[1].nValue = 50000000 * COIN;
-            txCoinbase.vout[1].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("ec1ab14139850ef2520199c49ba1e46656c9e84f") << OP_EQUALVERIFY << OP_CHECKSIG;
+            // MN1 Collateral - 10,000 PIV2 (y7L1LfAfdSbMCu9qvvEYd9LHq97FqUPeaM)
+            // keyID: 71817c92a17425d81c724d51b576cec0a69eeeb8
+            txCoinbase.vout[1].nValue = 10000 * COIN;
+            txCoinbase.vout[1].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("71817c92a17425d81c724d51b576cec0a69eeeb8") << OP_EQUALVERIFY << OP_CHECKSIG;
 
-            LogPrintf("PIV2 Block 1 Premine: 100,000,000 PIV2 distributed (Dev + Faucet)\n");
+            // MN2 Collateral - 10,000 PIV2 (yA3MEDZbpDaPPTUqid6AxAbHd7rjiWvWaN)
+            // keyID: 8f436522f5020cec0c60d755d3283d67bb8e44ff
+            txCoinbase.vout[2].nValue = 10000 * COIN;
+            txCoinbase.vout[2].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("8f436522f5020cec0c60d755d3283d67bb8e44ff") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            // MN3 Collateral - 10,000 PIV2 (yAi9Rhh4W7e7SnQ5FkdL2bDS5dDDSLiK9r)
+            // keyID: 9699c409d4e47b80f40cf33e8ef85b892101a168
+            txCoinbase.vout[3].nValue = 10000 * COIN;
+            txCoinbase.vout[3].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("9699c409d4e47b80f40cf33e8ef85b892101a168") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            LogPrintf("PIV2 Block 1 Premine: 530,000 PIV2 (Dev + 3 MN collaterals)\n");
         } else {
             // REGTEST Premine: 50,030,300 PIV2 (simplified)
             // Output 0: Test Wallet (50,000,000 PIV2)

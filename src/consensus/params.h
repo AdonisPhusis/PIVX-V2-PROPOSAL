@@ -18,16 +18,17 @@ namespace Consensus {
 /**
  * Genesis Masternode entry for DMN bootstrap.
  * These MNs are injected into the DMN list at block 0 to enable DMM block production.
+ *
+ * Like ETH2/Cosmos, genesis MNs are defined in the initial state, not via transactions.
+ * - No IP address: MNs announce their service address via P2P after launch
+ * - No ProRegTx needed: their legitimacy comes from being in the genesis state
+ * - Collateral is created at block 1 (premine) to their owner addresses
  */
 struct GenesisMN {
-    std::string proTxHash;           // Synthetic proTxHash (e.g., genesis block hash + MN index)
-    std::string collateralTxHash;    // Genesis block coinbase txid
-    uint32_t collateralIndex;        // Output index in genesis coinbase (0, 1, 2 for MN1, MN2, MN3)
-    std::string ownerKeyID;          // Owner key ID (hex, 20 bytes)
-    std::string operatorPubKey;      // Operator pubkey (hex, 33 bytes compressed ECDSA)
-    std::string votingKeyID;         // Voting key ID (hex, 20 bytes) - same as owner for genesis
-    std::string serviceAddr;         // Service address "IP:port"
-    std::string payoutAddress;       // Payout script (hex)
+    std::string ownerAddress;        // Owner address (receives 10k collateral at block 1)
+    std::string operatorPubKey;      // Operator pubkey (hex, 33 bytes compressed ECDSA) - signs blocks
+    std::string payoutAddress;       // Payout address (receives MN rewards)
+    // Note: votingKey defaults to owner, IP announced via P2P
 };
 
 /**

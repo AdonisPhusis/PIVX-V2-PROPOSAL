@@ -160,7 +160,11 @@ void CActiveDeterministicMasternodeManager::Init(const CBlockIndex* pindexTip)
 
     LogPrintf("%s: proTxHash=%s, proTx=%s\n", __func__, dmn->proTxHash.ToString(), dmn->ToString());
 
-    if (info.service != dmn->pdmnState->addr) {
+    // PIV2: Check if this is a genesis MN (registered at height 0)
+    // Genesis MNs are trusted and skip IP verification to allow flexibility during testnet
+    bool isGenesisMN = (dmn->pdmnState->nRegisteredHeight == 0);
+
+    if (!isGenesisMN && info.service != dmn->pdmnState->addr) {
         state = MASTERNODE_ERROR;
         strError = strprintf("Local address %s does not match the address from ProTx (%s)",
                              info.service.ToStringIPPort(), dmn->pdmnState->addr.ToStringIPPort());
@@ -168,8 +172,14 @@ void CActiveDeterministicMasternodeManager::Init(const CBlockIndex* pindexTip)
         return;
     }
 
-    // Check socket connectivity (skip on regtest for local testing convenience)
-    if (!Params().IsRegTestNet()) {
+    if (isGenesisMN && info.service != dmn->pdmnState->addr) {
+        // Genesis MN running on different IP - update the service address for local operations
+        LogPrintf("%s: Genesis MN detected, accepting local address %s (configured: %s)\n",
+                  __func__, info.service.ToStringIPPort(), dmn->pdmnState->addr.ToStringIPPort());
+    }
+
+    // Check socket connectivity (skip on regtest and for genesis MNs)
+    if (!Params().IsRegTestNet() && !isGenesisMN) {
         const std::string& strService = info.service.ToString();
         LogPrintf("%s: Checking inbound connection to '%s'\n", __func__, strService);
         SOCKET hSocket = CreateSocket(info.service);
@@ -189,7 +199,8 @@ void CActiveDeterministicMasternodeManager::Init(const CBlockIndex* pindexTip)
             return;
         }
     } else {
-        LogPrintf("%s: Skipping connectivity check on regtest\n", __func__);
+        LogPrintf("%s: Skipping connectivity check (regtest=%d, genesisMN=%d)\n",
+                  __func__, Params().IsRegTestNet(), isGenesisMN);
     }
 
     info.proTxHash = dmn->proTxHash;

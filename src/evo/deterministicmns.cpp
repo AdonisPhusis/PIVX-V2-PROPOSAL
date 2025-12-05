@@ -8,15 +8,18 @@
 #include "chain.h"
 #include "coins.h"
 #include "chainparams.h"
+#include "consensus/params.h"  // For Consensus::GenesisMN
 #include "consensus/upgrades.h"
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "key_io.h"
 #include "guiinterface.h"
 #include "masternodeman.h" // for mnodeman (!TODO: remove)
+#include "netbase.h"       // For Lookup()
 #include "script/standard.h"
 #include "spork.h"
 #include "sync.h"
+#include "utilstrencodings.h"  // For ParseHex
 
 #include <univalue.h>
 
@@ -24,6 +27,79 @@ static const std::string DB_LIST_SNAPSHOT = "dmn_S";
 static const std::string DB_LIST_DIFF = "dmn_D";
 
 std::unique_ptr<CDeterministicMNManager> deterministicMNManager;
+
+/**
+ * PIV2: Inject genesis masternodes into DMN list at block 0.
+ * This enables DMM block production without the "egg and chicken" problem
+ * of needing blocks to register MNs and needing MNs to produce blocks.
+ */
+static void InjectGenesisMasternodes(CDeterministicMNList& mnList, const uint256& blockHash)
+{
+    const auto& consensusParams = Params().GetConsensus();
+    if (consensusParams.genesisMNs.empty()) {
+        return;  // No genesis MNs configured
+    }
+
+    LogPrintf("DMN: Injecting %d genesis masternodes at block 0\n", consensusParams.genesisMNs.size());
+
+    uint64_t internalId = 0;
+    for (const auto& genesisMN : consensusParams.genesisMNs) {
+        try {
+            // Create DMN state
+            auto state = std::make_shared<CDeterministicMNState>();
+            state->nRegisteredHeight = 0;
+            state->nLastPaidHeight = 0;
+            state->nPoSePenalty = 0;
+            state->nPoSeRevivedHeight = -1;
+            state->nPoSeBanHeight = -1;
+
+            // Parse owner key ID (20 bytes hex)
+            std::vector<unsigned char> ownerKeyIDBytes = ParseHex(genesisMN.ownerKeyID);
+            if (ownerKeyIDBytes.size() == 20) {
+                state->keyIDOwner = CKeyID(uint160(ownerKeyIDBytes));
+            }
+
+            // Parse operator pubkey (33 bytes compressed ECDSA)
+            std::vector<unsigned char> operatorPubKeyBytes = ParseHex(genesisMN.operatorPubKey);
+            if (operatorPubKeyBytes.size() == 33) {
+                state->pubKeyOperator = CPubKey(operatorPubKeyBytes.begin(), operatorPubKeyBytes.end());
+            }
+
+            // Parse voting key ID (20 bytes hex)
+            std::vector<unsigned char> votingKeyIDBytes = ParseHex(genesisMN.votingKeyID);
+            if (votingKeyIDBytes.size() == 20) {
+                state->keyIDVoting = CKeyID(uint160(votingKeyIDBytes));
+            }
+
+            // Parse service address
+            Lookup(genesisMN.serviceAddr.c_str(), state->addr, 0, false);
+
+            // Parse payout script
+            std::vector<unsigned char> payoutScriptBytes = ParseHex(genesisMN.payoutAddress);
+            state->scriptPayout = CScript(payoutScriptBytes.begin(), payoutScriptBytes.end());
+
+            // Set confirmed hash to genesis block hash (immediately confirmed)
+            state->UpdateConfirmedHash(uint256S(genesisMN.proTxHash), blockHash);
+
+            // Create DMN entry
+            auto dmn = std::make_shared<CDeterministicMN>(internalId);
+            dmn->proTxHash = uint256S(genesisMN.proTxHash);
+            dmn->collateralOutpoint = COutPoint(uint256S(genesisMN.collateralTxHash), genesisMN.collateralIndex);
+            dmn->nOperatorReward = 0;  // No operator reward for genesis MNs
+            dmn->pdmnState = state;
+
+            // Add to list
+            mnList.AddMN(dmn, true);
+
+            LogPrintf("DMN: Added genesis MN %d: proTxHash=%s, service=%s\n",
+                      internalId, dmn->proTxHash.ToString(), state->addr.ToStringIPPort());
+        } catch (const std::exception& e) {
+            LogPrintf("DMN: ERROR adding genesis MN %d: %s\n", internalId, e.what());
+        }
+
+        internalId++;
+    }
+}
 
 std::string CDeterministicMNState::ToString() const
 {
@@ -850,6 +926,8 @@ CDeterministicMNList CDeterministicMNManager::GetListForBlock(const CBlockIndex*
                 throw std::runtime_error(err);
             }
             snapshot = CDeterministicMNList(pindex->GetBlockHash(), -1, 0);
+            // PIV2: Inject genesis masternodes at block 0 to bootstrap DMM
+            InjectGenesisMasternodes(snapshot, pindex->GetBlockHash());
             mnListsCache.emplace(pindex->GetBlockHash(), snapshot);
             break;
         }

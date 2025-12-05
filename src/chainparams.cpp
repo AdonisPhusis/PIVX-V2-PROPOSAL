@@ -671,6 +671,52 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_V6_0].nActivationHeight          =
                 Consensus::NetworkUpgrade::ALWAYS_ACTIVE;  // KHU active from genesis
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // PIV2 Genesis Masternodes - Testnet Bootstrap
+        // These MNs are injected at block 0 to enable DMM block production
+        // without the "egg and chicken" problem of needing blocks to register MNs
+        // and needing MNs to produce blocks.
+        // ═══════════════════════════════════════════════════════════════════════
+        // Keys generated: 2025-12-04 via regtest key derivation
+        // Coinbase txid (merkle root): f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3
+        // VPS IPs: 57.131.33.151, 57.131.33.152, 57.131.33.214
+        // ═══════════════════════════════════════════════════════════════════════
+        consensus.genesisMNs = {
+            // MN1 - VPS 57.131.33.151
+            {
+                "c550f0790797e42234b8e9b318a28b8a508f2cf70cdf1b4e60c7d4fdb33787df",  // proTxHash (synthetic: sha256(genesis_hash + 0))
+                "f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3",  // collateralTxHash (genesis coinbase)
+                0,  // collateralIndex (output 0)
+                "87060609b12d797fd2396629957fde4a3d3adbff",  // ownerKeyID
+                "02841677a39503313fb368490d1e817ee46ce78de803ef26cc684f773bfe510730",  // operatorPubKey
+                "87060609b12d797fd2396629957fde4a3d3adbff",  // votingKeyID (same as owner)
+                "57.131.33.151:27171",  // serviceAddr
+                "76a91487060609b12d797fd2396629957fde4a3d3adbff88ac"  // payoutAddress (P2PKH)
+            },
+            // MN2 - VPS 57.131.33.152
+            {
+                "a838b47c0d8f70e356bcdffe7b11d52fa73969aa729f4122cb77c29ef66b201f",  // proTxHash (synthetic: sha256(genesis_hash + 1))
+                "f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3",  // collateralTxHash (genesis coinbase)
+                1,  // collateralIndex (output 1)
+                "2563dfb22c186e7d2741ed6d785856f7f17e187a",  // ownerKeyID
+                "0252578510b38f3cd4f520faab8ccfe2703f0a21498cc7071a2f1d3483209eb8a1",  // operatorPubKey
+                "2563dfb22c186e7d2741ed6d785856f7f17e187a",  // votingKeyID (same as owner)
+                "57.131.33.152:27171",  // serviceAddr
+                "76a9142563dfb22c186e7d2741ed6d785856f7f17e187a88ac"  // payoutAddress (P2PKH)
+            },
+            // MN3 - VPS 57.131.33.214
+            {
+                "1176beec1bafbedbb07da904e3b45aca466efc3eaae7edd68753a816187e0987",  // proTxHash (synthetic: sha256(genesis_hash + 2))
+                "f14fac7a43eff3c44336a76109ac95717075785e4c48c496c384f8aa3198b5a3",  // collateralTxHash (genesis coinbase)
+                2,  // collateralIndex (output 2)
+                "dd2ba22aec7280230ff03da61b7141d7acf12edd",  // ownerKeyID
+                "03c354dd0ded289836371337ffe18f4b8d3c06f009858e68d49705ba3e6b67c25c",  // operatorPubKey
+                "dd2ba22aec7280230ff03da61b7141d7acf12edd",  // votingKeyID (same as owner)
+                "57.131.33.214:27171",  // serviceAddr
+                "76a914dd2ba22aec7280230ff03da61b7141d7acf12edd88ac"  // payoutAddress (P2PKH)
+            }
+        };
+
         /**
          * The message start string is designed to be unlikely to occur in normal data.
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce

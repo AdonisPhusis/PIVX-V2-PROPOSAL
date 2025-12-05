@@ -11,8 +11,24 @@
 #include "uint256.h"
 #include <map>
 #include <string>
+#include <vector>
 
 namespace Consensus {
+
+/**
+ * Genesis Masternode entry for DMN bootstrap.
+ * These MNs are injected into the DMN list at block 0 to enable DMM block production.
+ */
+struct GenesisMN {
+    std::string proTxHash;           // Synthetic proTxHash (e.g., genesis block hash + MN index)
+    std::string collateralTxHash;    // Genesis block coinbase txid
+    uint32_t collateralIndex;        // Output index in genesis coinbase (0, 1, 2 for MN1, MN2, MN3)
+    std::string ownerKeyID;          // Owner key ID (hex, 20 bytes)
+    std::string operatorPubKey;      // Operator pubkey (hex, 33 bytes compressed ECDSA)
+    std::string votingKeyID;         // Voting key ID (hex, 20 bytes) - same as owner for genesis
+    std::string serviceAddr;         // Service address "IP:port"
+    std::string payoutAddress;       // Payout script (hex)
+};
 
 /**
 * Index into Params.vUpgrades and NetworkUpgradeInfo
@@ -176,6 +192,9 @@ struct Params {
 
     // Map with network updates
     NetworkUpgrade vUpgrades[MAX_NETWORK_UPGRADES];
+
+    // DMN Genesis bootstrap - MNs to inject at block 0 for DMM to work
+    std::vector<GenesisMN> genesisMNs;
 
     int64_t TargetTimespan(const bool fV2 = true) const { return fV2 ? nTargetTimespanV2 : nTargetTimespan; }
     bool MoneyRange(const CAmount& nValue) const { return (nValue >= 0 && nValue <= nMaxMoneyOut); }

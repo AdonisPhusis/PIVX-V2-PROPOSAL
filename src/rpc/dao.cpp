@@ -9,7 +9,6 @@
 #include "util/system.h"
 #include "validation.h"
 #include "evo/deterministicmns.h"
-#include "masternode-sync.h"
 #include "activemasternode.h"
 
 /**

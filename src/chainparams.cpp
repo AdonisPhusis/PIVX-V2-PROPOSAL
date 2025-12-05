@@ -458,6 +458,7 @@ public:
         consensus.nHuQuorumThreshold = 8;           // 8/12 signatures for finality
         consensus.nHuQuorumRotationBlocks = 12;     // New quorum every 12 blocks
         consensus.nHuLeaderTimeoutSeconds = 45;     // DMM leader timeout (fallback after 45s)
+        consensus.nHuFallbackRecoverySeconds = 15;  // Recovery window for fallback MNs
         consensus.nHuMaxReorgDepth = 12;            // Max reorg before finality
 
         // spork keys
@@ -634,6 +635,7 @@ public:
         consensus.nHuQuorumThreshold = 2;           // 2/3 signatures for finality
         consensus.nHuQuorumRotationBlocks = 3;      // Fast rotation (every 3 blocks)
         consensus.nHuLeaderTimeoutSeconds = 30;     // Aggressive timeout for testing
+        consensus.nHuFallbackRecoverySeconds = 10;  // Fast recovery for testnet
         consensus.nHuMaxReorgDepth = 1;             // Finality at 1 block (quorum-based)
 
         // spork keys
@@ -843,6 +845,7 @@ public:
         consensus.nHuQuorumThreshold = 1;           // 1 signature = finality
         consensus.nHuQuorumRotationBlocks = 1;      // Rotate every block
         consensus.nHuLeaderTimeoutSeconds = 5;      // Short timeout (less relevant in regtest)
+        consensus.nHuFallbackRecoverySeconds = 2;   // Ultra-fast for regtest
         consensus.nHuMaxReorgDepth = 100;           // Large tolerance for test scenarios
 
         /* Spork Key for RegTest:

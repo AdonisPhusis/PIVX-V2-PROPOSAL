@@ -5,6 +5,7 @@
 #include "evo/blockproducer.h"
 
 #include "chain.h"
+#include "chainparams.h"
 #include "consensus/validation.h"
 #include "hash.h"
 #include "logging.h"
@@ -86,6 +87,66 @@ bool GetBlockProducer(const CBlockIndex* pindexPrev,
              __func__, pindexPrev->nHeight + 1,
              outMn->proTxHash.ToString().substr(0, 16),
              scores[0].first.ToString().substr(0, 16));
+
+    return true;
+}
+
+bool GetBlockProducerWithFallback(const CBlockIndex* pindexPrev,
+                                   const CDeterministicMNList& mnList,
+                                   int64_t nBlockTime,
+                                   CDeterministicMNCPtr& outMn,
+                                   int& outProducerIndex)
+{
+    outMn = nullptr;
+    outProducerIndex = 0;
+
+    if (!pindexPrev) {
+        return false;
+    }
+
+    auto scores = CalculateBlockProducerScores(pindexPrev, mnList);
+
+    if (scores.empty()) {
+        LogPrint(BCLog::MASTERNODE, "%s: No confirmed MNs for block %d\n",
+                 __func__, pindexPrev->nHeight + 1);
+        return false;
+    }
+
+    // Get consensus params for timeout values
+    const Consensus::Params& consensusParams = Params().GetConsensus();
+    int64_t nPrevBlockTime = pindexPrev->GetBlockTime();
+    int64_t nTimeSincePrevBlock = nBlockTime - nPrevBlockTime;
+
+    // Calculate which producer should be active based on time elapsed
+    // Primary: 0 to nHuLeaderTimeoutSeconds
+    // Fallback 1: nHuLeaderTimeoutSeconds to nHuLeaderTimeoutSeconds + nHuFallbackRecoverySeconds
+    // Fallback 2: nHuLeaderTimeoutSeconds + nHuFallbackRecoverySeconds to ...
+    // etc.
+
+    int producerIndex = 0;
+    if (nTimeSincePrevBlock > consensusParams.nHuLeaderTimeoutSeconds) {
+        // Past primary window, calculate fallback index
+        int64_t fallbackTime = nTimeSincePrevBlock - consensusParams.nHuLeaderTimeoutSeconds;
+        producerIndex = 1 + (fallbackTime / consensusParams.nHuFallbackRecoverySeconds);
+
+        // Cap to available MNs
+        if (producerIndex >= (int)scores.size()) {
+            producerIndex = scores.size() - 1;
+        }
+    }
+
+    outMn = scores[producerIndex].second;
+    outProducerIndex = producerIndex;
+
+    if (producerIndex > 0) {
+        LogPrintf("%s: Block %d FALLBACK producer #%d: %s (time since prev: %ds)\n",
+                 __func__, pindexPrev->nHeight + 1, producerIndex,
+                 outMn->proTxHash.ToString().substr(0, 16), nTimeSincePrevBlock);
+    } else {
+        LogPrint(BCLog::MASTERNODE, "%s: Block %d PRIMARY producer: %s\n",
+                 __func__, pindexPrev->nHeight + 1,
+                 outMn->proTxHash.ToString().substr(0, 16));
+    }
 
     return true;
 }

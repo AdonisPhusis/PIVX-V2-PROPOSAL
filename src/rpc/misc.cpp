@@ -9,7 +9,6 @@
 #include "httpserver.h"
 #include "key_io.h"
 #include "sapling/key_io_sapling.h"
-#include "masternode-sync.h"
 #include "messagesigner.h"
 #include "net.h"
 #include "netbase.h"
@@ -185,16 +184,29 @@ UniValue mnsync(const JSONRPCRequest& request)
         UniValue obj(UniValue::VOBJ);
 
         // PIV2: Simplified sync status based on HU finality
-        obj.pushKV("IsBlockchainSynced", g_tiertwo_sync_state.IsBlockchainSynced());
-        obj.pushKV("chainHeight", g_tiertwo_sync_state.GetChainHeight());
-        obj.pushKV("syncStatus", masternodeSync.GetSyncStatus());
+        bool isSynced = g_tiertwo_sync_state.IsBlockchainSynced();
+        int height = g_tiertwo_sync_state.GetChainHeight();
+
+        obj.pushKV("IsBlockchainSynced", isSynced);
+        obj.pushKV("chainHeight", height);
+
+        // PIV2: Generate sync status inline
+        std::string syncStatus;
+        if (isSynced) {
+            syncStatus = "Synchronized (HU finality)";
+        } else if (height < PIV2_BOOTSTRAP_BLOCKS) {
+            syncStatus = strprintf("Bootstrap phase (%d/%d blocks)", height, PIV2_BOOTSTRAP_BLOCKS);
+        } else {
+            syncStatus = "Waiting for finalized blocks...";
+        }
+        obj.pushKV("syncStatus", syncStatus);
         obj.pushKV("syncPhase", g_tiertwo_sync_state.GetSyncPhase());
 
         return obj;
     }
 
     if (strMode == "reset") {
-        masternodeSync.Reset();
+        g_tiertwo_sync_state.ResetData();
         return "success";
     }
     return "failure";

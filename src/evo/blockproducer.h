@@ -60,6 +60,26 @@ bool GetBlockProducer(const CBlockIndex* pindexPrev,
                       CDeterministicMNCPtr& outMn);
 
 /**
+ * Select the block producer with fallback support for timeout recovery.
+ *
+ * If the primary producer hasn't produced a block within nHuLeaderTimeoutSeconds,
+ * fallback producers are selected based on their score ranking. Each fallback
+ * has a recovery window of nHuFallbackRecoverySeconds.
+ *
+ * @param pindexPrev        Previous block index
+ * @param mnList            DMN list at pindexPrev
+ * @param nBlockTime        Current block timestamp
+ * @param outMn             [out] Selected masternode
+ * @param outProducerIndex  [out] Producer index (0 = primary, 1+ = fallback)
+ * @return                  true if producer found
+ */
+bool GetBlockProducerWithFallback(const CBlockIndex* pindexPrev,
+                                   const CDeterministicMNList& mnList,
+                                   int64_t nBlockTime,
+                                   CDeterministicMNCPtr& outMn,
+                                   int& outProducerIndex);
+
+/**
  * Calculate all MN scores for debugging/verification.
  *
  * @param pindexPrev     Previous block index

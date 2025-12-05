@@ -173,6 +173,7 @@ struct Params {
 
     // DMM leader timeout
     int nHuLeaderTimeoutSeconds;    // Timeout before fallback to next MN (45s mainnet)
+    int nHuFallbackRecoverySeconds; // Recovery window for fallback MNs (15s testnet/mainnet)
 
     // Reorg protection
     int nHuMaxReorgDepth;           // Max reorg depth before finality (12 mainnet)

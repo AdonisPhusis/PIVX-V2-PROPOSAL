@@ -14,7 +14,6 @@
 #include "destination_io.h"
 #include "httpserver.h"
 #include "key_io.h"
-#include "masternode-sync.h"
 #include "messagesigner.h"
 #include "net.h"
 #include "policy/feerate.h"

@@ -13,7 +13,6 @@
 #include "piv2/piv2_finality.h"
 #include "piv2/piv2_signaling.h"
 #include "masternode-payments.h"
-#include "masternode-sync.h"
 #include "masternodeman.h"
 #include "merkleblock.h"
 #include "netbase.h"

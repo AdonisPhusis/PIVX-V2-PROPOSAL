@@ -231,7 +231,6 @@ BITCOIN_CORE_H = \
   memusage.h \
   masternode.h \
   masternode-payments.h \
-  masternode-sync.h \
   masternodeman.h \
   masternodeconfig.h \
   merkleblock.h \
@@ -526,7 +525,6 @@ libbitcoin_common_a_SOURCES = \
   keystore.cpp \
   masternode.cpp \
   masternode-payments.cpp \
-  masternode-sync.cpp \
   masternodeconfig.cpp \
   masternodeman.cpp \
   messagesigner.cpp \
@@ -543,7 +541,6 @@ libbitcoin_common_a_SOURCES = \
   script/sign.cpp \
   script/standard.cpp \
   script/conditional.cpp \
-  tiertwo_networksync.cpp \
   tiertwo/netfulfilledman.cpp \
   tiertwo/tiertwo_sync_state.cpp \
   warnings.cpp \

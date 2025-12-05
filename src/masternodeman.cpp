@@ -9,7 +9,6 @@
 #include "evo/deterministicmns.h"
 #include "fs.h"
 #include "masternode-payments.h"
-#include "masternode-sync.h"
 #include "masternode.h"
 #include "messagesigner.h"
 #include "netbase.h"
@@ -1178,8 +1177,7 @@ void ThreadCheckMasternodes()
             MilliSleep(1000);
             boost::this_thread::interruption_point();
 
-            // try to sync from all available nodes, one step at a time
-            masternodeSync.Process();
+            // PIV2: Sync is automatic via HU finality - no legacy sync process needed
 
             if (g_tiertwo_sync_state.IsBlockchainSynced()) {
                 c++;

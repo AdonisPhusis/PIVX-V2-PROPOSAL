@@ -7,7 +7,7 @@ reset-files.bash
 *.tar.gz
 
 *.exe
-src/piv2
+# src/piv2 directory is NOT ignored (contains source code)
 src/piv2d
 src/piv2-cli
 src/piv2-tx

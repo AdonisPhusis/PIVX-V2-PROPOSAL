@@ -222,6 +222,7 @@ BITCOIN_CORE_H = \
   piv2/piv2_statedb.h \
   piv2/piv2_unlock.h \
   piv2/piv2_utxo.h \
+  piv2/piv2_signaling.h \
   piv2/piv2_validation.h \
   piv2/zkpiv2_db.h \
   piv2/zkpiv2_memo.h \
@@ -358,6 +359,7 @@ libbitcoin_server_a_SOURCES = \
   consensus/mn_validation.cpp \
   piv2/piv2_finality.cpp \
   piv2/piv2_quorum.cpp \
+  piv2/piv2_signaling.cpp \
   tiertwo/masternode_meta_manager.cpp \
   tiertwo/net_masternodes.cpp \
   httprpc.cpp \
@@ -504,6 +506,7 @@ libbitcoin_common_a_SOURCES = \
   piv2/piv2_statedb.cpp \
   piv2/piv2_unlock.cpp \
   piv2/piv2_utxo.cpp \
+  piv2/piv2_signaling.cpp \
   piv2/piv2_validation.cpp \
   piv2/zkpiv2_db.cpp \
   piv2/zkpiv2_memo.cpp \

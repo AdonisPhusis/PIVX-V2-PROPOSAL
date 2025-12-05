@@ -32,6 +32,7 @@
 #include "piv2/piv2_validation.h"
 #include "piv2/piv2_domc_tx.h"
 #include "piv2/piv2_finality.h"
+#include "piv2/piv2_signaling.h"
 #include "masternode-payments.h"
 #include "masternodeman.h"
 #include "policy/policy.h"
@@ -2138,6 +2139,12 @@ bool static ConnectTip(CValidationState& state, CBlockIndex* pindexNew, const st
     LogPrint(BCLog::BENCHMARK, "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
 
     connectTrace.BlockConnected(pindexNew, std::move(pthisBlock));
+
+    // HU Signaling: Notify that block was connected (triggers MN signing if in quorum)
+    if (g_connman) {
+        hu::NotifyBlockConnected(pindexNew, g_connman.get());
+    }
+
     return true;
 }
 

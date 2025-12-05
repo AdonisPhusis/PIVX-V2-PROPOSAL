@@ -284,6 +284,11 @@ extern const char* QBSIGSHARES;
 extern const char* QSIGREC;
 extern const char* QSIGSHARE;
 extern const char* CLSIG;
+/**
+ * The husig message is used to propagate HU finality signatures (ECDSA, 2/3 quorum)
+ * Each MN in the quorum signs blocks they receive and broadcasts the signature.
+ */
+extern const char* HUSIG;
 }; // namespace NetMsgType
 
 /* Get a vector of all valid message types (see above) */

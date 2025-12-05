@@ -634,7 +634,7 @@ public:
         consensus.nHuQuorumThreshold = 2;           // 2/3 signatures for finality
         consensus.nHuQuorumRotationBlocks = 3;      // Fast rotation (every 3 blocks)
         consensus.nHuLeaderTimeoutSeconds = 30;     // Aggressive timeout for testing
-        consensus.nHuMaxReorgDepth = 6;             // More tolerance for testnet
+        consensus.nHuMaxReorgDepth = 1;             // Finality at 1 block (quorum-based)
 
         // spork keys
         consensus.strSporkPubKey = "04677c34726c491117265f4b1c83cef085684f36c8df5a97a3a42fc499316d0c4e63959c9eca0dba239d9aaaf72011afffeb3ef9f51b9017811dec686e412eb504";

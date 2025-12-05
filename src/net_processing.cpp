@@ -11,6 +11,7 @@
 #include "evo/deterministicmns.h"
 #include "evo/mnauth.h"
 #include "piv2/piv2_finality.h"
+#include "piv2/piv2_signaling.h"
 #include "masternode-payments.h"
 #include "masternode-sync.h"
 #include "masternodeman.h"
@@ -2016,6 +2017,20 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
     else if (strCommand == NetMsgType::NOTFOUND) {
         // We do not care about the NOTFOUND message (for now), but logging an Unknown Command
         // message is undesirable as we transmit it ourselves.
+        return true;
+    }
+
+    // HU Finality Signature (PIV2 quorum-based finality)
+    else if (strCommand == NetMsgType::HUSIG) {
+        hu::CHuSignature sig;
+        vRecv >> sig;
+
+        LogPrint(BCLog::HU, "Received HUSIG from peer=%d for block %s\n",
+                 pfrom->GetId(), sig.blockHash.ToString().substr(0, 16));
+
+        if (hu::huSignalingManager) {
+            hu::huSignalingManager->ProcessHuSignature(sig, pfrom, connman);
+        }
         return true;
     }
 

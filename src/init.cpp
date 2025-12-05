@@ -28,6 +28,8 @@
 #include "key.h"
 #include "piv2/piv2_validation.h"
 #include "piv2/piv2_domcdb.h"
+#include "piv2/piv2_finality.h"
+#include "piv2/piv2_signaling.h"
 #include "mapport.h"
 #include "netbase.h"
 #include "net_processing.h"
@@ -243,6 +245,11 @@ void Shutdown()
     peerLogic.reset();
 
     DumpTierTwo();
+
+    // Shutdown HU Signaling and Finality systems
+    hu::ShutdownHuSignaling();
+    hu::ShutdownHuFinality();
+
     if (::mempool.IsLoaded() && gArgs.GetBoolArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
         DumpMempool(::mempool);
     }
@@ -1675,6 +1682,10 @@ bool AppInitMain()
             g_best_block_cv.notify_all();
         }
     }
+
+    // Initialize HU Finality and Signaling systems
+    hu::InitHuFinality();
+    hu::InitHuSignaling();
 
     std::vector<fs::path> vImportFiles;
     for (const std::string& strFile : gArgs.GetArgs("-loadblock")) {

@@ -190,3 +190,5 @@ src/bench/bench_piv2
 src/test/test_piv2
 src/qt/piv2-qt
 src/qt/test/test_piv2-qt
+src/bench/bench_pivx
+src/test/test_pivx

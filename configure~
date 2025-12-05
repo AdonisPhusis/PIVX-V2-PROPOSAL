@@ -3458,7 +3458,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-ac_config_headers="$ac_config_headers src/config/hu-config.h"
+ac_config_headers="$ac_config_headers src/config/piv2-config.h"
 
 
 
@@ -20676,6 +20676,18 @@ printf "%s\n" "no" >&6; }
 fi
 
 
+
+if test -z "$CARGO"; then
+  as_fn_error $? "Cargo (Rust package manager) not found.
+
+PIV2 requires Rust for Sapling support. Install it with:
+
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source ~/.cargo/env
+
+Then run ./configure again.
+  " "$LINENO" 5
+fi
 # Extract the first word of "ccache", so it can be a program name with args.
 set dummy ccache; ac_word=$2
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -29022,20 +29034,19 @@ if test x$enable_wallet != xno; then
 
 
 
+  if test "x$BDB_CFLAGS" = "x" && test "x$BDB_LIBS" = "x"; then
+        if test -f "/usr/local/BerkeleyDB.4.8/include/db_cxx.h"; then
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: Found BerkeleyDB 4.8 in /usr/local/BerkeleyDB.4.8" >&5
+printf "%s\n" "$as_me: Found BerkeleyDB 4.8 in /usr/local/BerkeleyDB.4.8" >&6;}
+      BDB_CFLAGS="-I/usr/local/BerkeleyDB.4.8/include"
+      BDB_LIBS="-L/usr/local/BerkeleyDB.4.8/lib -ldb_cxx-4.8"
+    fi
+  fi
+
   if test "x$BDB_CFLAGS" = "x"; then
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for Berkeley DB C++ headers" >&5
 printf %s "checking for Berkeley DB C++ headers... " >&6; }
-    BDB_CPPFLAGS=
-    bdbpath=X
-    bdb48path=X
-    bdbdirlist=
-    for _vn in 4.8 48 4 5 5.3 ''; do
-      for _pfx in b lib ''; do
-        bdbdirlist="$bdbdirlist ${_pfx}db${_vn}"
-      done
-    done
-    for searchpath in $bdbdirlist ''; do
-      test -n "${searchpath}" && searchpath="${searchpath}/"
+        for searchpath in "" "db4/" "db5/" "db5.3/"; do
       cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -29056,29 +29067,36 @@ _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"
 then :
 
-        if test "x$bdbpath" = "xX"; then
-          bdbpath="${searchpath}"
+        if test "x$searchpath" != "x"; then
+          BDB_CPPFLAGS="-I/usr/include/${searchpath}"
         fi
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: found" >&5
+printf "%s\n" "found" >&6; }
+        bdb_found=yes
+        break
 
-else case e in #(
-  e)
-        continue
-       ;;
-esac
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
-      cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+    done
+
+    if test "x$bdb_found" != "xyes"; then
+      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+      as_fn_error $? "libdb_cxx headers missing, PIVX V2 Core requires this library for wallet functionality (--disable-wallet to disable wallet functionality)" "$LINENO" 5
+    fi
+
+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-        #include <${searchpath}db_cxx.h>
+      #include <db_cxx.h>
 
 int
 main (void)
 {
 
-        #if !(DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR == 8)
-          #error "failed to find bdb 4.8"
-        #endif
+      #if !(DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR == 8)
+        #error "not bdb 4.8"
+      #endif
 
   ;
   return 0;
@@ -29087,31 +29105,17 @@ _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"
 then :
 
-        bdb48path="${searchpath}"
-        break
+      bdb48=yes
 
+else case e in #(
+  e)
+      bdb48=no
+     ;;
+esac
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
-    done
-    if test "x$bdbpath" = "xX"; then
-      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-      as_fn_error $? "libdb_cxx headers missing, PIVX V2 Core requires this library for wallet functionality (--disable-wallet to disable wallet functionality)" "$LINENO" 5
-    elif test "x$bdb48path" = "xX"; then
 
-  if test "x${bdbpath}" = "x"; then
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: default" >&5
-printf "%s\n" "default" >&6; }
-  else
-    echo "#include <${bdbpath}db_cxx.h>" >conftest.cpp
-    newinclpath=`${CXXCPP} ${CPPFLAGS} -M conftest.cpp 2>/dev/null |  tr -d '\\n\\r\\\\' | sed -e 's/^.*[[:space:]:]\(\/[^[:space:]]*\)db_cxx\.h[[:space:]].*$/\1/' -e t -e d`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: ${newinclpath}" >&5
-printf "%s\n" "${newinclpath}" >&6; }
-    if test "x${newinclpath}" != "x"; then
-      eval "BDB_CPPFLAGS=\"\$BDB_CPPFLAGS\"' -I${newinclpath}'"
-    fi
-  fi
-
+    if test "x$bdb48" != "xyes"; then
 
 # Check whether --with-incompatible-bdb was given.
 if test ${with_incompatible_bdb+y}
@@ -29127,22 +29131,6 @@ else case e in #(
 esac
 fi
 
-    else
-
-  if test "x${bdb48path}" = "x"; then
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: default" >&5
-printf "%s\n" "default" >&6; }
-  else
-    echo "#include <${bdb48path}db_cxx.h>" >conftest.cpp
-    newinclpath=`${CXXCPP} ${CPPFLAGS} -M conftest.cpp 2>/dev/null |  tr -d '\\n\\r\\\\' | sed -e 's/^.*[[:space:]:]\(\/[^[:space:]]*\)db_cxx\.h[[:space:]].*$/\1/' -e t -e d`
-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: ${newinclpath}" >&5
-printf "%s\n" "${newinclpath}" >&6; }
-    if test "x${newinclpath}" != "x"; then
-      eval "BDB_CPPFLAGS=\"\$BDB_CPPFLAGS\"' -I${newinclpath}'"
-    fi
-  fi
-
-      bdbpath="${bdb48path}"
     fi
   else
     BDB_CPPFLAGS=${BDB_CFLAGS}
@@ -29150,8 +29138,7 @@ printf "%s\n" "${newinclpath}" >&6; }
 
 
   if test "x$BDB_LIBS" = "x"; then
-    # TODO: Ideally this could find the library version and make sure it matches the headers being used
-    for searchlib in db_cxx-4.8 db_cxx db4_cxx; do
+        for searchlib in db_cxx-4.8 db_cxx-5.3 db_cxx db4_cxx; do
       as_ac_Lib=`printf "%s\n" "ac_cv_lib_$searchlib""_main" | sed "$as_sed_sh"`
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for main in -l$searchlib" >&5
 printf %s "checking for main in -l$searchlib... " >&6; }
@@ -29200,7 +29187,7 @@ fi
 
     done
     if test "x$BDB_LIBS" = "x"; then
-        as_fn_error $? "libdb_cxx missing, PIVX V2 Core requires this library for wallet functionality (--disable-wallet to disable wallet functionality)" "$LINENO" 5
+      as_fn_error $? "libdb_cxx missing, PIVX V2 Core requires this library for wallet functionality (--disable-wallet to disable wallet functionality)" "$LINENO" 5
     fi
   fi
 
@@ -33962,7 +33949,7 @@ cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
 for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
-    "src/config/hu-config.h") CONFIG_HEADERS="$CONFIG_HEADERS src/config/hu-config.h" ;;
+    "src/config/piv2-config.h") CONFIG_HEADERS="$CONFIG_HEADERS src/config/piv2-config.h" ;;
     "depfiles") CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "libbitcoinconsensus.pc") CONFIG_FILES="$CONFIG_FILES libbitcoinconsensus.pc:libbitcoinconsensus.pc.in" ;;

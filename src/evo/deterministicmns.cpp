@@ -661,6 +661,20 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
             // already confirmed
             return;
         }
+
+        // PIV2: Genesis MNs (registered at height 0) are confirmed immediately at block 1
+        // This enables DMM block production to start without waiting for minimum confirmations
+        bool isGenesisMN = (dmn->pdmnState->nRegisteredHeight == 0);
+        if (isGenesisMN && nHeight == 1) {
+            auto newState = std::make_shared<CDeterministicMNState>(*dmn->pdmnState);
+            // Use genesis block hash as confirmedHash for genesis MNs
+            newState->UpdateConfirmedHash(dmn->proTxHash, pindexPrev->GetBlockHash());
+            newList.UpdateMN(dmn->proTxHash, newState);
+            LogPrintf("DMN: Genesis MN %s confirmed at block 1 (confirmedHash=%s)\n",
+                      dmn->proTxHash.ToString().substr(0, 16), pindexPrev->GetBlockHash().ToString().substr(0, 16));
+            return;
+        }
+
         // this works on the previous block, so confirmation will happen one block after nMasternodeMinimumConfirmations
         // has been reached, but the block hash will then point to the block at nMasternodeMinimumConfirmations
         int nConfirmations = pindexPrev->nHeight - dmn->pdmnState->nRegisteredHeight;

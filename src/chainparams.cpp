@@ -701,7 +701,7 @@ public:
                 "482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74",  // collateralTxHash (genesis coinbase)
                 1,  // collateralIndex (output 1)
                 "2563dfb22c186e7d2741ed6d785856f7f17e187a",  // ownerKeyID
-                "0252578510b38f3cd4f520faab8ccfe2703f0a21498cc7071a2f1d3483209eb8a1",  // operatorPubKey
+                "02e6133571bcde14ef46f7d332cb517e273e66dafe886e2792e650a36da3e41392",  // operatorPubKey (WIF: cW1vzmUdmkKxSz24jjW6nciTo98V1odocKF4X7gaT5g92hwNwWmW)
                 "2563dfb22c186e7d2741ed6d785856f7f17e187a",  // votingKeyID (same as owner)
                 "57.131.33.152:27171",  // serviceAddr
                 "76a9142563dfb22c186e7d2741ed6d785856f7f17e187a88ac"  // payoutAddress (P2PKH)
@@ -712,7 +712,7 @@ public:
                 "482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74",  // collateralTxHash (genesis coinbase)
                 2,  // collateralIndex (output 2)
                 "dd2ba22aec7280230ff03da61b7141d7acf12edd",  // ownerKeyID
-                "03c354dd0ded289836371337ffe18f4b8d3c06f009858e68d49705ba3e6b67c25c",  // operatorPubKey
+                "030867eff81e9210f23ae4b0df4282cfdd254e4c7357e59370f40171af1587a9ea",  // operatorPubKey (WIF: cQ9Fsq7xcN5z89JVH5fwT1qXg2sosT4GkPumFqU9XzuD5PkgeD6k)
                 "dd2ba22aec7280230ff03da61b7141d7acf12edd",  // votingKeyID (same as owner)
                 "57.131.33.214:27171",  // serviceAddr
                 "76a914dd2ba22aec7280230ff03da61b7141d7acf12edd88ac"  // payoutAddress (P2PKH)

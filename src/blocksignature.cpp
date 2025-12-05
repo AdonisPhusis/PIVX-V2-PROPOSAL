@@ -1,35 +1,11 @@
-// Copyright (c) 2017-2021 The PIVX Core developers
+// Copyright (c) 2025 The PIV2 Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blocksignature.h"
 
 #include "chainparams.h"
-#include "consensus/params.h"  // Consensus::HU_COINBASE_MATURITY
-#include "script/standard.h"
-#include "util/system.h"
-#include "validation.h"  // chainActive, cs_main
-
-static bool GetKeyIDFromUTXO(const CTxOut& utxo, CKeyID& keyIDRet)
-{
-    std::vector<valtype> vSolutions;
-    txnouttype whichType;
-    if (utxo.scriptPubKey.empty() || !Solver(utxo.scriptPubKey, whichType, vSolutions))
-        return false;
-    if (whichType == TX_PUBKEY) {
-        keyIDRet = CPubKey(vSolutions[0]).GetID();
-        return true;
-    }
-    if (whichType == TX_PUBKEYHASH) {
-        keyIDRet = CKeyID(uint160(vSolutions[0]));
-        return true;
-    }
-    if (whichType == TX_EXCHANGEADDR) {
-        keyIDRet = CExchangeKeyID(uint160(vSolutions[0]));
-        return true;
-    }
-    return false;
-}
+#include "validation.h"
 
 bool SignBlockWithKey(CBlock& block, const CKey& key)
 {
@@ -39,104 +15,31 @@ bool SignBlockWithKey(CBlock& block, const CKey& key)
     return true;
 }
 
-bool SignBlock(CBlock& block, const CKeyStore& keystore)
-{
-    CKeyID keyID;
-    if (!GetKeyIDFromUTXO(block.vtx[1]->vout[1], keyID)) {
-        return error("%s: failed to find key for PoS", __func__);
-    }
-
-    CKey key;
-    if (!keystore.GetKey(keyID, key))
-        return error("%s: failed to get key from keystore", __func__);
-
-    return SignBlockWithKey(block, key);
-}
-
 bool CheckBlockSignature(const CBlock& block)
 {
-    // Genesis block has no signature (only coinbase tx, no PoS staking tx)
-    // Genesis is identified by null prevblock hash
+    // Genesis block - no signature required
     if (block.hashPrevBlock.IsNull()) {
-        return true;  // Genesis block - no signature required
+        return true;
     }
 
-    // Regtest: Skip signature verification for mining convenience
-    // In production (mainnet/testnet), blocks MUST be signed by masternodes
+    // Regtest: Skip signature verification
     if (Params().IsRegTestNet()) {
         return true;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PIV2 Bootstrap: Blocks 1 and 2 exempt from signature (no MNs active yet)
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Block 1 (Premine): Creates spendable UTXO for MN collateral
-    // Block 2 (ProRegTx): MNs register with real collateral from Block 1
-    // Block 3+: Requires MN signature (DMM active)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Bootstrap phase: Blocks 1 and 2 exempt (no MNs active yet)
     {
         LOCK(cs_main);
         auto it = mapBlockIndex.find(block.hashPrevBlock);
         if (it != mapBlockIndex.end() && it->second->nHeight < 2) {
-            return true;  // Blocks 1 and 2 - bootstrap phase, no MN signature required
+            return true;
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PIV2 DMM Blocks: MN-only signature verification
-    // ═══════════════════════════════════════════════════════════════════════════
-    // DMM blocks have only coinbase (vtx.size() == 1), no PoS coinstake tx.
-    // The signature is in block.vchBlockSig and is verified by CheckBlockMNOnly()
-    // in ConnectBlock(). This legacy CheckBlockSignature() only handles PoS blocks.
-    //
-    // For DMM blocks, we return true here and let CheckBlockMNOnly() do the
-    // actual MN signature verification with the correct operator pubkey.
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (block.vtx.size() == 1) {
-        // DMM block (coinbase only) - signature verified by CheckBlockMNOnly
-        // Just verify signature exists (actual verification in ConnectBlock)
-        if (block.vchBlockSig.empty()) {
-            return error("%s: DMM block has empty vchBlockSig!", __func__);
-        }
-        return true;  // Signature will be verified by CheckBlockMNOnly in ConnectBlock
+    // DMM blocks: Signature verified by CheckBlockMNOnly in ConnectBlock
+    if (block.vchBlockSig.empty()) {
+        return error("%s: block has empty vchBlockSig!", __func__);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Legacy PoS Block Signature Verification (for old blocks if any)
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (block.vchBlockSig.empty())
-        return error("%s: vchBlockSig is empty!", __func__);
-
-    // Block signature verification (PoS style - requires vtx[1] coinstake)
-    CPubKey pubkey;
-    {
-        txnouttype whichType;
-        std::vector<valtype> vSolutions;
-        const CTxOut& txout = block.vtx[1]->vout[1];
-        if (!Solver(txout.scriptPubKey, whichType, vSolutions))
-            return false;
-
-        if (whichType == TX_PUBKEY) {
-            valtype& vchPubKey = vSolutions[0];
-            pubkey = CPubKey(vchPubKey);
-        } else if (whichType == TX_PUBKEYHASH) {
-            const CTxIn& txin = block.vtx[1]->vin[0];
-            // Check if the scriptSig is for a p2pk or a p2pkh
-            if (txin.scriptSig.size() == 73) { // Sig size + DER signature size.
-                // If the input is for a p2pk and the output is a p2pkh.
-                // We don't have the pubkey to verify the block sig anywhere in this block.
-                // p2pk scriptsig only contains the signature and p2pkh scriptpubkey only contain the hash.
-                return false;
-            } else {
-                unsigned int start = 1 + (unsigned int) *txin.scriptSig.begin(); // skip sig
-                if (start >= txin.scriptSig.size() - 1) return false;
-                pubkey = CPubKey(txin.scriptSig.begin()+start+1, txin.scriptSig.end());
-            }
-        }
-    }
-
-    if (!pubkey.IsValid())
-        return error("%s: invalid pubkey %s", __func__, HexStr(pubkey));
-
-    return pubkey.Verify(block.GetHash(), block.vchBlockSig);
+    return true;
 }

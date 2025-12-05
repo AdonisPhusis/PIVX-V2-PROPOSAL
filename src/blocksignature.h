@@ -1,16 +1,14 @@
-// Copyright (c) 2017-2021 The PIVX Core developers
+// Copyright (c) 2025 The PIV2 Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef HU_BLOCKSIGNATURE_H
-#define HU_BLOCKSIGNATURE_H
+#ifndef PIV2_BLOCKSIGNATURE_H
+#define PIV2_BLOCKSIGNATURE_H
 
 #include "key.h"
 #include "primitives/block.h"
-#include "keystore.h"
 
 bool SignBlockWithKey(CBlock& block, const CKey& key);
-bool SignBlock(CBlock& block, const CKeyStore& keystore);
 bool CheckBlockSignature(const CBlock& block);
 
-#endif // HU_BLOCKSIGNATURE_H
+#endif // PIV2_BLOCKSIGNATURE_H

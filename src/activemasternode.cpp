@@ -7,6 +7,7 @@
 
 #include "addrman.h"
 #include "blockassembler.h"
+#include "net.h"  // For g_connman and CNode
 #include "consensus/merkle.h"
 #include "consensus/mn_validation.h"
 #include "evo/blockproducer.h"
@@ -349,8 +350,42 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
         return false;
     }
 
-    if (isBootstrap) {
-        LogPrintf("DMM-SCHEDULER: Bootstrap mode active (height=%d), bypassing sync check\n",
+    // PIV2 Fork Prevention: During bootstrap, ensure we have peers agreeing on our tip
+    // before producing a block. This prevents each node from creating its own chain.
+    if (isBootstrap && pindexPrev->nHeight > 0) {
+        // Get number of peers that have announced at least our current height
+        int nPeersWithOurTip = 0;
+        int nConnectedPeers = 0;
+        if (g_connman) {
+            g_connman->ForEachNode([&](CNode* pnode) {
+                if (pnode->fSuccessfullyConnected && !pnode->fDisconnect) {
+                    nConnectedPeers++;
+                    // Check if peer announced at least our current height when connecting
+                    // nStartingHeight is the height the peer reported in their version message
+                    if (pnode->nStartingHeight >= pindexPrev->nHeight) {
+                        nPeersWithOurTip++;
+                    }
+                }
+            });
+        }
+
+        // Require at least 1 peer at our height (for 3 MN network, we need agreement)
+        // For genesis block (height 0), allow production without peers
+        int nRequiredPeers = 1;
+        if (nPeersWithOurTip < nRequiredPeers) {
+            static int64_t nLastWarnTime = 0;
+            int64_t nNow = GetTime();
+            if (nNow - nLastWarnTime > 30) {  // Warn every 30 seconds
+                LogPrintf("DMM-SCHEDULER: Bootstrap - waiting for peer consensus (have %d/%d peers at height %d, need %d)\n",
+                          nPeersWithOurTip, nConnectedPeers, pindexPrev->nHeight, nRequiredPeers);
+                nLastWarnTime = nNow;
+            }
+            return false;
+        }
+        LogPrintf("DMM-SCHEDULER: Bootstrap mode active (height=%d, %d/%d peers synced)\n",
+                  pindexPrev->nHeight, nPeersWithOurTip, nConnectedPeers);
+    } else if (isBootstrap) {
+        LogPrintf("DMM-SCHEDULER: Bootstrap mode - genesis block production (height=%d)\n",
                   pindexPrev->nHeight);
     }
 

@@ -826,17 +826,11 @@ bool static AlreadyHave(const CInv& inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     case MSG_SPORK:
         return mapSporks.count(inv.hash);
     case MSG_MASTERNODE_WINNER:
-        if (masternodePayments.mapMasternodePayeeVotes.count(inv.hash)) {
-            g_tiertwo_sync_state.AddedMasternodeWinner(inv.hash);
-            return true;
-        }
-        return false;
+        // PIV2: Legacy sync tracking removed
+        return masternodePayments.mapMasternodePayeeVotes.count(inv.hash);
     case MSG_MASTERNODE_ANNOUNCE:
-        if (mnodeman.mapSeenMasternodeBroadcast.count(inv.hash)) {
-            g_tiertwo_sync_state.AddedMasternodeList(inv.hash);
-            return true;
-        }
-        return false;
+        // PIV2: Legacy sync tracking removed
+        return mnodeman.mapSeenMasternodeBroadcast.count(inv.hash);
     case MSG_MASTERNODE_PING:
         return mnodeman.mapSeenMasternodePing.count(inv.hash);
     case MSG_QUORUM_FINAL_COMMITMENT:
@@ -2038,9 +2032,8 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
         // Tier two msg type search
         const std::vector<std::string>& allMessages = getTierTwoNetMessageTypes();
         if (std::find(allMessages.begin(), allMessages.end(), strCommand) != allMessages.end()) {
-            // Check if the dispatcher can process this message first. If not, try going with the old flow.
-            if (!masternodeSync.MessageDispatcher(pfrom, strCommand, vRecv)) {
-                // Probably one the extensions, future: encapsulate all of this inside tiertwo_networksync.
+            // PIV2: Process tier-two messages directly (legacy sync dispatcher removed)
+            {
                 int dosScore{0};
                 if (!mnodeman.ProcessMessage(pfrom, strCommand, vRecv, dosScore)) {
                     WITH_LOCK(cs_main, Misbehaving(pfrom->GetId(), dosScore));

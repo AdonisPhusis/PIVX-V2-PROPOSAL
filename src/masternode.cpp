@@ -466,7 +466,7 @@ bool CMasternodeBroadcast::CheckAndUpdate(int& nDos)
         if (pmn->UpdateFromNewBroadcast((*this))) {
             if (pmn->IsEnabled()) Relay();
         }
-        g_tiertwo_sync_state.AddedMasternodeList(GetHash());
+        // PIV2: Legacy sync tracking removed
     }
 
     return true;

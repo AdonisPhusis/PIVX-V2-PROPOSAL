@@ -334,12 +334,8 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
         return false;
     }
 
-    // PIV2: Bootstrap phase - first 10 blocks exempt from sync check
-    // This allows the network to bootstrap without the chicken-and-egg problem
-    // where sync requires blocks but blocks require sync
-    bool isBootstrapPhase = (pindexPrev->nHeight < 10);
-
-    if (!isBootstrapPhase && !g_tiertwo_sync_state.IsBlockchainSynced()) {
+    // PIV2: Check sync state (includes bootstrap phase check)
+    if (!g_tiertwo_sync_state.IsBlockchainSynced()) {
         static int64_t nLastSyncWarnTime = 0;
         int64_t nNow = GetTime();
         if (nNow - nLastSyncWarnTime > 30) {

@@ -1902,6 +1902,16 @@ void static UpdateTip(CBlockIndex* pindexNew)
         g_best_block_cv.notify_all();
     }
 
+    // PIV2: Update sync state based on chain height and HU finality
+    g_tiertwo_sync_state.SetChainHeight(pindexNew->nHeight);
+
+    // Check if this block is finalized (has HU quorum)
+    bool isFinalized = hu::PreviousBlockHasQuorum(pindexNew) ||
+                       (pindexNew->nHeight < PIV2_BOOTSTRAP_BLOCKS);
+    if (isFinalized) {
+        g_tiertwo_sync_state.OnFinalizedBlock(pindexNew->nHeight, GetTime());
+    }
+
     const CBlockIndex* pChainTip = chainActive.Tip();
     assert(pChainTip != nullptr);
     LogPrintf("%s: new best=%s  height=%d version=%d  log2_work=%.16f  tx=%lu  date=%s progress=%f  cache=%.1fMiB(%utxo)  evodb_cache=%.1fMiB\n",

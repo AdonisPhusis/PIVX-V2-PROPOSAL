@@ -169,21 +169,9 @@ UniValue mnsync(const JSONRPCRequest& request)
             "\nResult ('status' mode):\n"
             "{\n"
             "  \"IsBlockchainSynced\": true|false,    (boolean) 'true' if blockchain is synced\n"
-            "  \"lastMasternodeList\": xxxx,        (numeric) Timestamp of last MN list message\n"
-            "  \"lastMasternodeWinner\": xxxx,      (numeric) Timestamp of last MN winner message\n"
-            "  \"lastBudgetItem\": xxxx,            (numeric) Timestamp of last MN budget message\n"
-            "  \"lastFailure\": xxxx,           (numeric) Timestamp of last failed sync\n"
-            "  \"nCountFailures\": n,           (numeric) Number of failed syncs (total)\n"
-            "  \"sumMasternodeList\": n,        (numeric) Number of MN list messages (total)\n"
-            "  \"sumMasternodeWinner\": n,      (numeric) Number of MN winner messages (total)\n"
-            "  \"sumBudgetItemProp\": n,        (numeric) Number of MN budget messages (total)\n"
-            "  \"sumBudgetItemFin\": n,         (numeric) Number of MN budget finalization messages (total)\n"
-            "  \"countMasternodeList\": n,      (numeric) Number of MN list messages (local)\n"
-            "  \"countMasternodeWinner\": n,    (numeric) Number of MN winner messages (local)\n"
-            "  \"countBudgetItemProp\": n,      (numeric) Number of MN budget messages (local)\n"
-            "  \"countBudgetItemFin\": n,       (numeric) Number of MN budget finalization messages (local)\n"
-            "  \"RequestedMasternodeAssets\": n, (numeric) Status code of last sync phase\n"
-            "  \"RequestedMasternodeAttempt\": n, (numeric) Status code of last sync attempt\n"
+            "  \"chainHeight\": n,                    (numeric) Current chain height\n"
+            "  \"syncStatus\": \"xxxx\",              (string) Sync status message\n"
+            "  \"syncPhase\": n                       (numeric) Sync phase code\n"
             "}\n"
 
             "\nResult ('reset' mode):\n"
@@ -196,17 +184,11 @@ UniValue mnsync(const JSONRPCRequest& request)
     if (strMode == "status") {
         UniValue obj(UniValue::VOBJ);
 
+        // PIV2: Simplified sync status based on HU finality
         obj.pushKV("IsBlockchainSynced", g_tiertwo_sync_state.IsBlockchainSynced());
-        obj.pushKV("lastMasternodeList", g_tiertwo_sync_state.GetlastMasternodeList());
-        obj.pushKV("lastMasternodeWinner", g_tiertwo_sync_state.GetlastMasternodeWinner());
-        obj.pushKV("lastFailure", masternodeSync.lastFailure);
-        obj.pushKV("nCountFailures", masternodeSync.nCountFailures);
-        obj.pushKV("sumMasternodeList", masternodeSync.sumMasternodeList);
-        obj.pushKV("sumMasternodeWinner", masternodeSync.sumMasternodeWinner);
-        obj.pushKV("countMasternodeList", masternodeSync.countMasternodeList);
-        obj.pushKV("countMasternodeWinner", masternodeSync.countMasternodeWinner);
-        obj.pushKV("RequestedMasternodeAssets", g_tiertwo_sync_state.GetSyncPhase());
-        obj.pushKV("RequestedMasternodeAttempt", masternodeSync.RequestedMasternodeAttempt);
+        obj.pushKV("chainHeight", g_tiertwo_sync_state.GetChainHeight());
+        obj.pushKV("syncStatus", masternodeSync.GetSyncStatus());
+        obj.pushKV("syncPhase", g_tiertwo_sync_state.GetSyncPhase());
 
         return obj;
     }

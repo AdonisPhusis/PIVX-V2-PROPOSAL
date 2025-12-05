@@ -82,10 +82,32 @@ bool CheckBlockSignature(const CBlock& block)
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PIV2 DMM Blocks: MN-only signature verification
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DMM blocks have only coinbase (vtx.size() == 1), no PoS coinstake tx.
+    // The signature is in block.vchBlockSig and is verified by CheckBlockMNOnly()
+    // in ConnectBlock(). This legacy CheckBlockSignature() only handles PoS blocks.
+    //
+    // For DMM blocks, we return true here and let CheckBlockMNOnly() do the
+    // actual MN signature verification with the correct operator pubkey.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (block.vtx.size() == 1) {
+        // DMM block (coinbase only) - signature verified by CheckBlockMNOnly
+        // Just verify signature exists (actual verification in ConnectBlock)
+        if (block.vchBlockSig.empty()) {
+            return error("%s: DMM block has empty vchBlockSig!", __func__);
+        }
+        return true;  // Signature will be verified by CheckBlockMNOnly in ConnectBlock
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Legacy PoS Block Signature Verification (for old blocks if any)
+    // ═══════════════════════════════════════════════════════════════════════════
     if (block.vchBlockSig.empty())
         return error("%s: vchBlockSig is empty!", __func__);
 
-    // Block signature verification
+    // Block signature verification (PoS style - requires vtx[1] coinstake)
     CPubKey pubkey;
     {
         txnouttype whichType;

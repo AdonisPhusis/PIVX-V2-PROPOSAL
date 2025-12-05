@@ -58,8 +58,8 @@ private:
     std::atomic<int> nLastProducedHeight{0};
     std::atomic<bool> fDMMSchedulerRunning{false};
     std::thread dmmSchedulerThread;
-    static constexpr int DMM_BLOCK_INTERVAL_SECONDS = 2;  // Minimum seconds between block attempts
-    static constexpr int DMM_MISSED_BLOCK_TIMEOUT = 10;   // Seconds before considering a missed block
+    static constexpr int DMM_BLOCK_INTERVAL_SECONDS = 60;  // Block interval (matches nTargetSpacing)
+    static constexpr int DMM_MISSED_BLOCK_TIMEOUT = 90;   // Seconds before considering a missed block (1.5x interval)
 
 public:
     ~CActiveDeterministicMasternodeManager() override { StopDMMScheduler(); }

@@ -680,15 +680,17 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
         int nConfirmations = pindexPrev->nHeight - dmn->pdmnState->nRegisteredHeight;
 
         // ═══════════════════════════════════════════════════════════════════════════
-        // PIV2 Bootstrap Exception: MNs registered at Block 2 are confirmed immediately
+        // PIV2 Bootstrap Exception: MNs registered during bootstrap are confirmed immediately
         // ═══════════════════════════════════════════════════════════════════════════
         // Block 0 = Genesis (no MNs)
         // Block 1 = Premine (collateral created)
-        // Block 2 = ProRegTx (MNs registered) - need immediate confirmation
-        // Block 3+ = DMM active (MNs must be confirmed to produce blocks)
+        // Block 2 = Collateral tx confirmation
+        // Blocks 3-5 = ProRegTx (MNs registered) - need immediate confirmation
+        // Block 6+ = DMM active (MNs must be confirmed to produce blocks)
         // Without this exception, MNs would wait nMasternodeCollateralMinConf blocks
         // ═══════════════════════════════════════════════════════════════════════════
-        bool bBootstrapMN = (dmn->pdmnState->nRegisteredHeight <= 2);
+        static const int PIV2_BOOTSTRAP_HEIGHT = 5;
+        bool bBootstrapMN = (dmn->pdmnState->nRegisteredHeight <= PIV2_BOOTSTRAP_HEIGHT);
 
         if (bBootstrapMN || nConfirmations >= consensus.MasternodeCollateralMinConf()) {
             auto newState = std::make_shared<CDeterministicMNState>(*dmn->pdmnState);

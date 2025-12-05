@@ -11,19 +11,11 @@ TierTwoSyncState g_tiertwo_sync_state;
 /**
  * PIV2: Simplified sync check based on HU finality
  *
- * Synced if:
- * 1. We're in bootstrap phase (first 10 blocks) - always synced
- * 2. We received a finalized block (with HU quorum) in the last 60 seconds
+ * Synced if we received a finalized block (with HU quorum) in the last 60 seconds.
+ * No bootstrap phase - quorum required from block 1.
  */
 bool TierTwoSyncState::IsBlockchainSynced() const
 {
-    int height = m_chain_height.load();
-
-    // Bootstrap phase: always synced for first 10 blocks
-    if (height < PIV2_BOOTSTRAP_BLOCKS) {
-        return true;
-    }
-
     // Check if we received a finalized block recently
     int64_t lastFinalized = m_last_finalized_time.load();
     int64_t now = GetTime();

@@ -190,14 +190,12 @@ UniValue mnsync(const JSONRPCRequest& request)
         obj.pushKV("IsBlockchainSynced", isSynced);
         obj.pushKV("chainHeight", height);
 
-        // PIV2: Generate sync status inline
+        // PIV2: Generate sync status inline (no bootstrap phase)
         std::string syncStatus;
         if (isSynced) {
             syncStatus = "Synchronized (HU finality)";
-        } else if (height < PIV2_BOOTSTRAP_BLOCKS) {
-            syncStatus = strprintf("Bootstrap phase (%d/%d blocks)", height, PIV2_BOOTSTRAP_BLOCKS);
         } else {
-            syncStatus = "Waiting for finalized blocks...";
+            syncStatus = "Waiting for HU quorum...";
         }
         obj.pushKV("syncStatus", syncStatus);
         obj.pushKV("syncPhase", g_tiertwo_sync_state.GetSyncPhase());

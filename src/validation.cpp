@@ -1906,8 +1906,8 @@ void static UpdateTip(CBlockIndex* pindexNew)
     g_tiertwo_sync_state.SetChainHeight(pindexNew->nHeight);
 
     // Check if this block is finalized (has HU quorum)
-    bool isFinalized = hu::PreviousBlockHasQuorum(pindexNew) ||
-                       (pindexNew->nHeight < PIV2_BOOTSTRAP_BLOCKS);
+    // No bootstrap phase - quorum required from block 1
+    bool isFinalized = hu::PreviousBlockHasQuorum(pindexNew);
     if (isFinalized) {
         g_tiertwo_sync_state.OnFinalizedBlock(pindexNew->nHeight, GetTime());
     }

@@ -18,14 +18,13 @@ class uint256;  // Forward declaration for legacy functions
 #define MASTERNODE_SYNC_FINISHED 999
 
 // PIV2: Sync is based on receiving finalized blocks (HU quorum)
-// Bootstrap phase: first 10 blocks are always considered synced
-#define PIV2_BOOTSTRAP_BLOCKS 10
+// No bootstrap phase - quorum required from block 1
 // Sync timeout: consider synced if we received a finalized block in last 60 seconds
 #define PIV2_SYNC_TIMEOUT 60
 
 class TierTwoSyncState {
 public:
-    // PIV2: Synced if we received a finalized block recently OR in bootstrap phase
+    // PIV2: Synced if we received a finalized block recently (quorum achieved)
     bool IsBlockchainSynced() const;
     bool IsSynced() const { return IsBlockchainSynced(); }
     bool IsSporkListSynced() const { return true; }  // PIV2: Always true

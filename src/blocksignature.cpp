@@ -67,15 +67,8 @@ bool CheckBlockSignature(const CBlock& block)
         return true;
     }
 
-    // Testnet bootstrap: Allow unsigned blocks for first 10 blocks (maturity period)
-    // This enables initial MN registration before DMM can start producing signed blocks
-    if (Params().IsTestnet()) {
-        LOCK(cs_main);
-        if (chainActive.Height() < Consensus::Params::HU_COINBASE_MATURITY) {
-            LogPrintf("%s: Testnet bootstrap - allowing unsigned block at height %d\n", __func__, chainActive.Height() + 1);
-            return true;
-        }
-    }
+    // PIV2: No bootstrap phase - all blocks must be signed from block 1
+    // Genesis MNs are injected at block 0, so DMM can produce signed blocks immediately
 
     if (block.vchBlockSig.empty())
         return error("%s: vchBlockSig is empty!", __func__);

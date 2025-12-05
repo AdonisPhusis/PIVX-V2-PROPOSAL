@@ -4077,6 +4077,9 @@ int CWalletTx::GetBlocksToMaturity() const
     // HU REGTEST EXCEPTION: Genesis block (height 0) coinbase is immediately mature
     if (Params().IsRegTestNet() && m_confirm.block_height == 0)
         return 0;
+    // HU TESTNET EXCEPTION: Block 1 (premine) coinbase is immediately mature for bootstrap
+    if (Params().IsTestnet() && m_confirm.block_height == 1)
+        return 0;
     return std::max(0, (Consensus::Params::HU_COINBASE_MATURITY + 1) - GetDepthInMainChain());
 }
 
@@ -4085,6 +4088,9 @@ bool CWalletTx::IsInMainChainImmature() const
     if (!IsCoinBase()) return false;
     // HU REGTEST EXCEPTION: Genesis block (height 0) coinbase is immediately mature
     if (Params().IsRegTestNet() && m_confirm.block_height == 0)
+        return false;
+    // HU TESTNET EXCEPTION: Block 1 (premine) coinbase is immediately mature for bootstrap
+    if (Params().IsTestnet() && m_confirm.block_height == 1)
         return false;
     const int depth = GetDepthInMainChain();
     return (depth > 0 && depth <= Consensus::Params::HU_COINBASE_MATURITY);

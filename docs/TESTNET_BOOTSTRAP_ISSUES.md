@@ -4,7 +4,7 @@ Documentation des problèmes rencontrés lors du déploiement du testnet DMM (De
 
 **Date:** 2025-12-05
 **Version:** v0.9.0.0
-**Commits:** 307bf08 → a5adb8f
+**Commits:** 307bf08 → 632813c
 
 ---
 
@@ -15,7 +15,10 @@ Documentation des problèmes rencontrés lors du déploiement du testnet DMM (De
 3. [Problème: MN ne s'initialise pas - IP mismatch](#3-problème-mn-ne-sinitialise-pas---ip-mismatch)
 4. [Problème: Invalid mnoperatorprivatekey](#4-problème-invalid-mnoperatorprivatekey)
 5. [Problème: Config section - clé non lue](#5-problème-config-section---clé-non-lue)
-6. [Résumé des clés finales](#6-résumé-des-clés-finales)
+6. [Problème: fInitialDownload bloque l'init MN](#6-problème-finitialdownload-bloque-linit-mn)
+7. [Problème: invalid-time-mask rejection](#7-problème-invalid-time-mask-rejection)
+8. [Problème: masternode=1 manquant](#8-problème-masternode1-manquant)
+9. [Résumé des clés finales](#9-résumé-des-clés-finales)
 
 ---
 
@@ -258,7 +261,134 @@ rpcallowip=127.0.0.1
 
 ---
 
-## 6. Résumé des clés finales
+## 6. Problème: fInitialDownload bloque l'init MN
+
+### Symptôme
+```
+UpdatedBlockTip: height=0, fInitialDownload=1, fMasterNode=1, state=0
+```
+Le log "Deterministic Masternode initialized" n'apparaît jamais, même avec une clé valide.
+
+### Cause
+La fonction `UpdatedBlockTip()` dans `activemasternode.cpp` retourne immédiatement si `fInitialDownload` est true. Au bootstrap (block 0), `fInitialDownload` est toujours true car il n'y a pas de blocs récents. Cela empêche:
+1. L'initialisation du MN (`Init()` n'est jamais appelé après genesis)
+2. Le démarrage du scheduler DMM
+
+De même, `TryProducingBlock()` vérifie `IsBlockchainSynced()` qui retourne false au bootstrap.
+
+### Solution
+Ajouter un bypass pour la phase bootstrap (10 premiers blocs):
+
+```cpp
+// Dans activemasternode.cpp, fonction UpdatedBlockTip()
+bool isBootstrapPhase = (pindexNew->nHeight < 10);
+
+if (fInitialDownload && !isBootstrapPhase)
+    return;
+
+if (fInitialDownload && isBootstrapPhase) {
+    LogPrintf("%s: Bootstrap phase detected (height=%d), allowing MN init\n",
+              __func__, pindexNew->nHeight);
+}
+```
+
+```cpp
+// Dans activemasternode.cpp, fonction TryProducingBlock()
+bool isBootstrap = (pindexPrev->nHeight < 10);
+
+if (!isBootstrap && !g_tiertwo_sync_state.IsBlockchainSynced()) {
+    return false;
+}
+
+if (isBootstrap) {
+    LogPrintf("DMM-SCHEDULER: Bootstrap mode active (height=%d), bypassing sync check\n",
+              pindexPrev->nHeight);
+}
+```
+
+### Commit
+`632813c` - fix(dmm): bootstrap bypass for genesis MN block production
+
+---
+
+## 7. Problème: invalid-time-mask rejection
+
+### Symptôme
+```
+AcceptBlockHeader: ContextualCheckBlockHeader failed for block xxx: invalid-time-mask
+DMM-SCHEDULER: Block xxx REJECTED
+```
+Les blocs sont créés et signés correctement mais rejetés par la validation.
+
+### Cause
+Le Time Protocol V2 (actif depuis height 0) exige que les timestamps des blocs soient des multiples de 15 secondes (`nTimeSlotLength = 15`). La fonction `UpdateTime()` dans `blockassembler.cpp` utilisait `GetAdjustedTime()` directement sans arrondir au time slot.
+
+### Vérification
+```cpp
+// Dans consensus/params.h
+bool IsValidBlockTimeStamp(int64_t nTime, int nHeight) const {
+    if (IsTimeProtocolV2(nHeight)) {
+        return (nTime % nTimeSlotLength) == 0;  // Must be multiple of 15
+    }
+    return true;
+}
+```
+
+### Solution
+Modifier `UpdateTime()` pour arrondir au time slot:
+
+```cpp
+// Dans blockassembler.cpp, fonction UpdateTime()
+int64_t nNewTime = std::max(pindexPrev->GetMedianTimePast()+1, GetAdjustedTime());
+
+// PIV2 Time Protocol V2: Round to valid time slot
+int nHeight = pindexPrev->nHeight + 1;
+if (consensusParams.IsTimeProtocolV2(nHeight)) {
+    nNewTime = GetTimeSlot(nNewTime);
+    // If rounding down puts us before median time past, round up
+    if (nNewTime <= pindexPrev->GetMedianTimePast()) {
+        nNewTime += consensusParams.nTimeSlotLength;
+    }
+}
+```
+
+### Commit
+`632813c` - fix(dmm): bootstrap bypass for genesis MN block production
+
+---
+
+## 8. Problème: masternode=1 manquant
+
+### Symptôme
+Le log "IS DETERMINISTIC MASTERNODE" n'apparaît pas au démarrage.
+
+### Cause
+Le code vérifie `fMasterNode` qui est initialisé via l'argument `-masternode`. Simplement avoir `mnoperatorprivatekey` ne suffit pas.
+
+### Vérification dans le code
+```cpp
+// Dans tiertwo/init.cpp
+fMasterNode = gArgs.GetBoolArg("-masternode", DEFAULT_MASTERNODE);
+```
+
+### Solution
+Ajouter `masternode=1` dans la section globale du config:
+
+```ini
+testnet=1
+server=1
+listen=1
+masternode=1
+mnoperatorprivatekey=cNixwpwjwk8wK7B8PfwHV6526rb6k5dFgrgi3cKQBQey1HjMVi8M
+
+[test]
+port=27171
+rpcport=27172
+```
+
+---
+
+## 9. Résumé des clés finales
 
 ### Genesis Masternodes (Testnet v3)
 
@@ -331,13 +461,29 @@ grep "DMM-SCHEDULER" ~/.piv2/testnet5/debug.log
 
 Avant le lancement mainnet, vérifier:
 
+### Clés et Sécurité
 - [ ] Générer de NOUVELLES clés pour les genesis MNs mainnet
-- [ ] Valider les checksums WIF de toutes les clés
-- [ ] Tester la production de blocs sur testnet pendant plusieurs jours
-- [ ] Documenter les IPs des MNs mainnet
-- [ ] S'assurer que `mnoperatorprivatekey` est HORS de la section réseau
+- [ ] Valider les checksums WIF de toutes les clés (script Python fourni)
+- [ ] Vérifier que les pubkeys correspondent aux WIF
+- [ ] Stocker les clés de manière sécurisée (pas dans les repos!)
+
+### Configuration
+- [ ] `masternode=1` présent dans la section globale du config
+- [ ] `mnoperatorprivatekey` présent dans la section globale (pas dans `[main]`)
 - [ ] Vérifier que le timestamp genesis est correct (proche de l'heure de lancement)
+- [ ] Documenter les IPs des MNs mainnet
+
+### Tests pré-lancement
+- [ ] Tester la production de blocs sur testnet pendant plusieurs jours
+- [ ] Vérifier que tous les 3 MNs produisent des blocs en rotation
 - [ ] Tester la synchronisation entre 3+ nœuds
+- [ ] Vérifier les logs pour les messages "Bootstrap mode active" (uniquement premiers 10 blocs)
+- [ ] Confirmer que les blocs passent la validation time-mask (multiples de 15s)
+
+### Post-lancement
+- [ ] Surveiller que `fInitialDownload` passe à false après quelques blocs
+- [ ] Vérifier que `IsBlockchainSynced()` retourne true après stabilisation
+- [ ] Confirmer que le bypass bootstrap se désactive après height 10
 
 ---
 

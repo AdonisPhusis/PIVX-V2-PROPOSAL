@@ -377,12 +377,9 @@ bool PreviousBlockHasQuorum(const CBlockIndex* pindexPrev)
 
     const Consensus::Params& consensus = Params().GetConsensus();
 
-    // Bootstrap phase: first N blocks don't require quorum
-    // This allows the network to start producing blocks
-    const int nBootstrapBlocks = 10;
-    if (pindexPrev->nHeight < nBootstrapBlocks) {
-        LogPrint(BCLog::HU, "HU Signaling: Bootstrap phase (height %d < %d), skipping quorum check\n",
-                 pindexPrev->nHeight, nBootstrapBlocks);
+    // Only genesis block (height 0) is exempt from quorum check
+    // Block 1+ requires quorum signatures from MNs
+    if (pindexPrev->nHeight < 1) {
         return true;
     }
 

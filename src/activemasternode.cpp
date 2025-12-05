@@ -230,18 +230,11 @@ void CActiveDeterministicMasternodeManager::UpdatedBlockTip(const CBlockIndex* p
     LogPrintf("%s: height=%d, fInitialDownload=%d, fMasterNode=%d, state=%d\n",
               __func__, pindexNew->nHeight, fInitialDownload, fMasterNode, state);
 
-    // PIV2 DMM Bootstrap: Allow MN initialization during bootstrap phase (first 10 blocks)
-    // At genesis, fInitialDownload is true because there are no recent blocks.
-    // Genesis MNs need to initialize and produce blocks to exit this state.
-    bool isBootstrapPhase = (pindexNew->nHeight < 10);
+    // Allow MN init at genesis (height 0-1) even during initial download
+    bool isBootstrapPhase = (pindexNew->nHeight < 2);
 
     if (fInitialDownload && !isBootstrapPhase)
         return;
-
-    if (fInitialDownload && isBootstrapPhase) {
-        LogPrintf("%s: Bootstrap phase detected (height=%d), allowing MN initialization despite fInitialDownload=true\n",
-                  __func__, pindexNew->nHeight);
-    }
 
     if (!fMasterNode || !deterministicMNManager->IsDIP3Enforced(pindexNew->nHeight))
         return;
@@ -341,19 +334,14 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
         return false;
     }
 
-    // PIV2 DMM Bootstrap: Allow block production at genesis even if not "synced"
-    // At bootstrap, IsBlockchainSynced() returns false because there are no recent blocks.
-    // Genesis MNs (height 0) should be able to produce the first blocks.
-    bool isBootstrap = (pindexPrev->nHeight < 10);  // First 10 blocks = bootstrap phase
+    // Only genesis block exempt from sync check
+    bool isGenesis = (pindexPrev->nHeight < 1);
 
-    // Don't produce if initial download (unless bootstrap)
-    if (!isBootstrap && !g_tiertwo_sync_state.IsBlockchainSynced()) {
+    if (!isGenesis && !g_tiertwo_sync_state.IsBlockchainSynced()) {
         return false;
     }
 
-    // PIV2 Quorum-Based Finality: Check if previous block has quorum (2/3 signatures)
-    // This replaces the old nStartingHeight-based check with real quorum verification.
-    // The previous block must be "final" (have enough signatures) before we produce the next.
+    // Quorum check: previous block must have 2/3 signatures
     if (!hu::PreviousBlockHasQuorum(pindexPrev)) {
         static int64_t nLastQuorumWarnTime = 0;
         int64_t nNow = GetTime();
@@ -365,11 +353,6 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
             nLastQuorumWarnTime = nNow;
         }
         return false;
-    }
-
-    // Bootstrap logging
-    if (isBootstrap) {
-        LogPrintf("DMM-SCHEDULER: Bootstrap mode active (height=%d)\n", pindexPrev->nHeight);
     }
 
     // Rate limiting - prevent double production

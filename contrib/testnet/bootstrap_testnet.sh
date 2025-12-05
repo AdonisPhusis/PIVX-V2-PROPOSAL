@@ -1,21 +1,52 @@
 #!/bin/bash
 # ============================================================================
-# PIV2 Testnet Bootstrap Script
+# PIV2 Testnet Bootstrap Script v2.0
 # ============================================================================
 # This script initializes the PIV2 testnet by:
-# 1. Generating Block 1 (Premine) with MN collateral + Dev + Faucet
-# 2. Registering 3 initial masternodes with ProRegTx
-# 3. Generating Block 2 to include the ProRegTx
-# 4. DMM becomes active at Block 3
+# 1. Generating Block 1 (Premine: 50M Dev + 50M Faucet)
+# 2. Creating 3 collateral outputs via sendmany
+# 3. Generating Block 2 to confirm collaterals
+# 4. Locking collateral UTXOs
+# 5. Registering 3 masternodes with ProRegTx
+# 6. Generating blocks to confirm each ProRegTx
+# 7. DMM becomes active after 3 MNs are registered
 # ============================================================================
 
 set -e
 
 # Configuration
-PIV2_CLI="${PIV2_CLI:-./src/piv2-cli}"
-PIV2D="${PIV2D:-./src/piv2d}"
-DATADIR="${DATADIR:-$HOME/.piv2}"
-NETWORK="testnet"
+DATADIR="${DATADIR:-/tmp/piv2_bootstrap}"
+PIV2_CLI="${PIV2_CLI:-/home/ubuntu/PIV2-Core/src/piv2-cli}"
+PIV2D="${PIV2D:-/home/ubuntu/PIV2-Core/src/piv2d}"
+CLI="$PIV2_CLI -testnet -datadir=$DATADIR"
+DAEMON="$PIV2D -testnet -datadir=$DATADIR"
+
+# Dev wallet key (CHANGE FOR MAINNET!)
+DEV_WALLET_KEY="cUHWixpfkqEXpCC2jJHPeTPsXvP3h9m1FtDEH4XJ8RHkKFnqWuGE"
+
+# Masternode IPs
+MN1_IP="57.131.33.151:27171"
+MN2_IP="57.131.33.152:27171"
+MN3_IP="57.131.33.214:27171"
+
+# Masternode keys (GENERATE NEW FOR MAINNET!)
+MN1_OWNER="y7L1LfAfdSbMCu9qvvEYd9LHq97FqUPeaM"
+MN1_VOTING="yHEGqeGT91oNvcqjkpEi9JweNyHvhEEHhW"
+MN1_PAYOUT="y5AxLQc6Wm9GiNs7mNxs1eZJdGtZTFrpnG"
+MN1_OP_PUBKEY="02f3ae14dee0a4ba9b1ce436e0cd8e2e30890b509fda174a7d623a39e9bc4acf0d"
+MN1_OP_SECRET="cMe84ZuQPK3cpvZsNWiAJU45KdrfX6FPTSno77tWBAyrHfSbCcAL"
+
+MN2_OWNER="yA3MEDZbpDaPPTUqid6AxAbHd7rjiWvWaN"
+MN2_VOTING="y8XquediqxGXxNLPdYNSc4BTCLh72r4Pid"
+MN2_PAYOUT="yJWrx8WkfQ9idqYEWUCvgQDVygGMmQQVC1"
+MN2_OP_PUBKEY="02a7534aa0965e5385c902366c1888869896e7a09b94c4cf36ad1012956517c1e0"
+MN2_OP_SECRET="cSbkaQuj1ViyoVPFxyckxa6xZGsipCx2itK8YHyGzktiAchtPtt6"
+
+MN3_OWNER="yAi9Rhh4W7e7SnQ5FkdL2bDS5dDDSLiK9r"
+MN3_VOTING="yKDRZHxazjX8gEN8QyLkukLRBupRzcM3Z7"
+MN3_PAYOUT="xzGBAK1kpGxpnASP6VQy1Bvwr7i5spWybJ"
+MN3_OP_PUBKEY="0312f12f5f4a3d6751de0e651820892a38a3d9f4b0360195b91c5e5490c05f9f5d"
+MN3_OP_SECRET="cUuP9odQzC4QDVxCACDgNMMWSPvzMXtgfYACsxiNaY9R7GsyGNsD"
 
 # Colors
 RED='\033[0;31m'
@@ -28,251 +59,227 @@ log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_step() { echo -e "\n${GREEN}========================================${NC}"; echo -e "${GREEN}$1${NC}"; echo -e "${GREEN}========================================${NC}"; }
 
-# RPC wrapper
-rpc() {
-    $PIV2_CLI -$NETWORK "$@"
-}
+# ============================================================================
+# MAIN BOOTSTRAP FUNCTION
+# ============================================================================
+full_bootstrap() {
+    log_step "[1/10] Cleaning up old data..."
+    pkill -9 piv2d 2>/dev/null || true
+    sleep 2
+    rm -rf "$DATADIR"
+    mkdir -p "$DATADIR"
 
-# Check if daemon is running
-check_daemon() {
-    if ! rpc getblockchaininfo &>/dev/null; then
-        log_error "piv2d is not running. Start it first with: $PIV2D -$NETWORK -daemon"
+    log_step "[2/10] Creating config..."
+    cat > "$DATADIR/piv2.conf" << EOF
+testnet=1
+server=1
+rpcuser=testuser
+rpcpassword=testpass123
+rpcallowip=127.0.0.1
+listen=0
+EOF
+
+    log_step "[3/10] Starting daemon..."
+    $DAEMON -daemon
+    sleep 10
+
+    if ! $CLI getblockcount > /dev/null 2>&1; then
+        log_error "Daemon failed to start"
         exit 1
     fi
-    log_success "piv2d is running"
-}
+    log_success "Daemon started. Block count: $($CLI getblockcount)"
 
-# Check current height
-check_height() {
-    local height=$(rpc getblockcount)
-    echo $height
-}
+    log_step "[4/10] Generating Block 1 (premine)..."
+    BLOCK1=$($CLI generatebootstrap 1)
+    log_success "Block 1 hash: $(echo $BLOCK1 | jq -r '.[0]')"
 
-# ============================================================================
-# STEP 1: Generate Block 1 (Premine)
-# ============================================================================
-generate_premine() {
-    local height=$(check_height)
+    log_step "[5/10] Importing dev wallet..."
+    $CLI importprivkey "$DEV_WALLET_KEY" "dev_wallet" false
+    $CLI rescanblockchain 0 > /dev/null
+    BALANCE=$($CLI getbalance)
+    log_success "Balance: $BALANCE PIV"
 
-    if [ "$height" -ge 1 ]; then
-        log_warn "Block 1 already exists (height=$height). Skipping premine generation."
-        return 0
+    log_step "[6/10] Creating collaterals via sendmany..."
+    COLL1=$($CLI getnewaddress "coll_mn1")
+    COLL2=$($CLI getnewaddress "coll_mn2")
+    COLL3=$($CLI getnewaddress "coll_mn3")
+
+    log_info "Collateral addresses:"
+    log_info "  MN1: $COLL1"
+    log_info "  MN2: $COLL2"
+    log_info "  MN3: $COLL3"
+
+    COLL_TXID=$($CLI sendmany "" "{\"$COLL1\":10000,\"$COLL2\":10000,\"$COLL3\":10000}")
+    log_success "Collateral TXID: $COLL_TXID"
+
+    # Generate Block 2 to confirm collaterals
+    log_info "Generating Block 2 (confirm collaterals)..."
+    $CLI generatebootstrap 1
+    log_success "Block count: $($CLI getblockcount)"
+
+    log_step "[7/10] Finding and locking collateral UTXOs..."
+    UTXOS=$($CLI listunspent)
+
+    # Find collateral vouts by label
+    VOUT_MN1=$(echo "$UTXOS" | jq -r ".[] | select(.amount == 10000 and .label == \"coll_mn1\") | .vout")
+    VOUT_MN2=$(echo "$UTXOS" | jq -r ".[] | select(.amount == 10000 and .label == \"coll_mn2\") | .vout")
+    VOUT_MN3=$(echo "$UTXOS" | jq -r ".[] | select(.amount == 10000 and .label == \"coll_mn3\") | .vout")
+
+    log_info "Collateral outputs:"
+    log_info "  MN1: $COLL_TXID:$VOUT_MN1"
+    log_info "  MN2: $COLL_TXID:$VOUT_MN2"
+    log_info "  MN3: $COLL_TXID:$VOUT_MN3"
+
+    # Lock collaterals (CRITICAL - prevents wallet from using them for fees)
+    $CLI lockunspent false true "[{\"txid\":\"$COLL_TXID\",\"vout\":$VOUT_MN1},{\"txid\":\"$COLL_TXID\",\"vout\":$VOUT_MN2},{\"txid\":\"$COLL_TXID\",\"vout\":$VOUT_MN3}]"
+    log_success "Collaterals locked"
+
+    log_step "[8/10] Registering MN1..."
+    MN1_PROTX=$($CLI protx_register "$COLL_TXID" $VOUT_MN1 "$MN1_IP" "$MN1_OWNER" "$MN1_OP_PUBKEY" "$MN1_VOTING" "$MN1_PAYOUT")
+    log_success "MN1 ProRegTx: $MN1_PROTX"
+    $CLI generatebootstrap 1
+    log_info "Block count: $($CLI getblockcount)"
+
+    log_info "Registering MN2..."
+    MN2_PROTX=$($CLI protx_register "$COLL_TXID" $VOUT_MN2 "$MN2_IP" "$MN2_OWNER" "$MN2_OP_PUBKEY" "$MN2_VOTING" "$MN2_PAYOUT")
+    log_success "MN2 ProRegTx: $MN2_PROTX"
+    $CLI generatebootstrap 1
+    log_info "Block count: $($CLI getblockcount)"
+
+    log_info "Registering MN3..."
+    MN3_PROTX=$($CLI protx_register "$COLL_TXID" $VOUT_MN3 "$MN3_IP" "$MN3_OWNER" "$MN3_OP_PUBKEY" "$MN3_VOTING" "$MN3_PAYOUT")
+    log_success "MN3 ProRegTx: $MN3_PROTX"
+    $CLI generatebootstrap 1
+    log_info "Block count: $($CLI getblockcount)"
+
+    log_step "[9/10] Verifying bootstrap..."
+    MN_COUNT=$($CLI getmasternodecount | jq '.total')
+    BLOCK_COUNT=$($CLI getblockcount)
+
+    log_info "Masternode count: $MN_COUNT"
+    log_info "Block count: $BLOCK_COUNT"
+
+    # Test DMM is active
+    if $CLI generate 1 2>&1 | grep -q "DMM"; then
+        log_success "DMM is active!"
+    else
+        log_warn "DMM may not be active"
     fi
 
-    log_info "Generating Block 1 (Premine)..."
-    log_info "  - MN1 Collateral: 10,000 PIV2"
-    log_info "  - MN2 Collateral: 10,000 PIV2"
-    log_info "  - MN3 Collateral: 10,000 PIV2"
-    log_info "  - Dev Wallet: 50,000,000 PIV2"
-    log_info "  - Faucet: 50,000,000 PIV2"
+    log_step "[10/10] Saving bootstrap info..."
+    cat > "$DATADIR/bootstrap_info.txt" << EOF
+PIV2 Testnet Bootstrap Info
+===========================
+Generated: $(date)
 
-    local result=$(rpc generatebootstrap 1)
-    local block1_hash=$(echo "$result" | jq -r '.[0]')
+Block Count: $BLOCK_COUNT
+Masternode Count: $MN_COUNT
 
-    log_success "Block 1 generated: $block1_hash"
+Collateral TXID: $COLL_TXID
 
-    # Show the premine outputs
-    log_info "Premine outputs:"
-    rpc getblock "$block1_hash" 2 | jq '.tx[0].vout[] | {n: .n, value: .value, address: .scriptPubKey.addresses[0]?}'
-}
+MN1:
+  IP: $MN1_IP
+  Collateral: $COLL_TXID:$VOUT_MN1
+  ProRegTx: $MN1_PROTX
+  Operator Secret: $MN1_OP_SECRET
 
-# ============================================================================
-# STEP 2: Register Masternodes
-# ============================================================================
-register_masternodes() {
-    local height=$(check_height)
+MN2:
+  IP: $MN2_IP
+  Collateral: $COLL_TXID:$VOUT_MN2
+  ProRegTx: $MN2_PROTX
+  Operator Secret: $MN2_OP_SECRET
 
-    if [ "$height" -lt 1 ]; then
-        log_error "Block 1 not yet generated. Run generate_premine first."
-        exit 1
-    fi
+MN3:
+  IP: $MN3_IP
+  Collateral: $COLL_TXID:$VOUT_MN3
+  ProRegTx: $MN3_PROTX
+  Operator Secret: $MN3_OP_SECRET
+EOF
 
-    if [ "$height" -ge 2 ]; then
-        log_warn "Block 2 already exists. MNs should already be registered."
-        return 0
-    fi
-
-    log_info "Registering 3 bootstrap masternodes..."
-
-    # Get Block 1 coinbase txid (premine)
-    local block1_hash=$(rpc getblockhash 1)
-    local coinbase_txid=$(rpc getblock "$block1_hash" | jq -r '.tx[0]')
-
-    log_info "Premine coinbase txid: $coinbase_txid"
-
-    # MN1: vout[0] = 10,000 PIV2
-    # MN2: vout[1] = 10,000 PIV2
-    # MN3: vout[2] = 10,000 PIV2
-
-    # Generate keys for each MN
-    log_info "Generating MN keys..."
-
-    for i in 1 2 3; do
-        local vout_index=$((i - 1))
-
-        # Generate owner, voting, and operator keys
-        local owner_addr=$(rpc getnewaddress "mn${i}_owner")
-        local voting_addr=$(rpc getnewaddress "mn${i}_voting")
-        local payout_addr=$(rpc getnewaddress "mn${i}_payout")
-
-        # Get operator key (we'll use the owner key for simplicity in testnet)
-        local operator_key=$(rpc getnewaddress "mn${i}_operator")
-        local operator_pubkey=$(rpc validateaddress "$operator_key" | jq -r '.pubkey')
-
-        log_info "MN$i: Registering with collateral vout[$vout_index]..."
-        log_info "  Owner: $owner_addr"
-        log_info "  Voting: $voting_addr"
-        log_info "  Payout: $payout_addr"
-        log_info "  Operator pubkey: $operator_pubkey"
-
-        # For testnet bootstrap, we need to import the premine keys first
-        # The premine addresses are hardcoded in blockassembler.cpp
-        # This script assumes you have the private keys for those addresses
-
-        # Register the masternode using protx register_fund
-        # Since collateral is already in block 1, we use protx register with external collateral
-
-        # TODO: The actual registration requires the private key of the premine address
-        # For now, we'll document the manual process
-
-        log_warn "MN$i registration requires manual setup with premine private keys"
-    done
-
+    log_step "BOOTSTRAP COMPLETE!"
+    echo ""
+    log_info "Bootstrap data saved to: $DATADIR"
+    log_info "Info file: $DATADIR/bootstrap_info.txt"
+    echo ""
+    log_info "Next steps:"
+    log_info "1. Copy blocks & chainstate to each VPS:"
+    log_info "   cd $DATADIR/testnet5 && tar czvf ~/bootstrap.tar.gz blocks chainstate"
     log_info ""
-    log_info "=========================================="
-    log_info "MANUAL REGISTRATION REQUIRED"
-    log_info "=========================================="
-    log_info "The premine addresses in Block 1 have hardcoded scripts."
-    log_info "To register MNs, you need to:"
+    log_info "2. On each VPS, extract and configure:"
+    log_info "   tar xzvf bootstrap.tar.gz -C ~/.piv2/testnet5/"
     log_info ""
-    log_info "1. Import the private keys for premine addresses into your wallet"
-    log_info "2. Use protx register to create ProRegTx for each MN"
-    log_info "3. The ProRegTx will reference the collateral from Block 1"
+    log_info "3. Add to piv2.conf on each VPS:"
+    log_info "   masternode=1"
+    log_info "   masternodeoperatorprivatekey=<OPERATOR_SECRET>"
     log_info ""
-    log_info "Example for MN1 (after importing key):"
-    log_info "  piv2-cli -testnet protx register \\"
-    log_info "    $coinbase_txid 0 \\"
-    log_info "    <ip>:<port> <owner_addr> <operator_pubkey> <voting_addr> \\"
-    log_info "    0 <payout_addr>"
-    log_info "=========================================="
+    log_info "Operator secrets:"
+    log_info "  MN1 (57.131.33.151): $MN1_OP_SECRET"
+    log_info "  MN2 (57.131.33.152): $MN2_OP_SECRET"
+    log_info "  MN3 (57.131.33.214): $MN3_OP_SECRET"
 }
 
 # ============================================================================
-# STEP 3: Generate Block 2 (Include ProRegTx)
-# ============================================================================
-generate_block2() {
-    local height=$(check_height)
-
-    if [ "$height" -lt 1 ]; then
-        log_error "Block 1 not yet generated. Run generate_premine first."
-        exit 1
-    fi
-
-    if [ "$height" -ge 2 ]; then
-        log_warn "Block 2 already exists (height=$height)."
-        return 0
-    fi
-
-    # Check if there are ProRegTx in mempool
-    local mempool_count=$(rpc getmempoolinfo | jq '.size')
-    log_info "Mempool has $mempool_count transactions"
-
-    if [ "$mempool_count" -eq 0 ]; then
-        log_warn "No ProRegTx in mempool. MNs will not be registered in Block 2."
-        log_warn "You can still generate Block 2, but DMM won't have any MNs."
-        read -p "Generate empty Block 2 anyway? (y/n) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Aborted. Add ProRegTx to mempool first."
-            exit 0
-        fi
-    fi
-
-    log_info "Generating Block 2..."
-    local result=$(rpc generatebootstrap 1)
-    local block2_hash=$(echo "$result" | jq -r '.[0]')
-
-    log_success "Block 2 generated: $block2_hash"
-
-    # Show MN list
-    log_info "Masternode list after Block 2:"
-    rpc protx list valid || log_warn "No MNs registered yet"
-}
-
-# ============================================================================
-# STEP 4: Status Check
+# SHOW STATUS
 # ============================================================================
 show_status() {
-    log_info "=========================================="
-    log_info "PIV2 Testnet Bootstrap Status"
-    log_info "=========================================="
+    log_info "PIV2 Testnet Status"
+    log_info "==================="
 
-    local height=$(check_height)
-    local mn_count=$(rpc protx list valid 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
-
-    log_info "Current height: $height"
-    log_info "Registered MNs: $mn_count"
-
-    if [ "$height" -lt 1 ]; then
-        log_warn "Status: Genesis only. Run 'bootstrap_testnet.sh premine' to generate Block 1"
-    elif [ "$height" -eq 1 ]; then
-        log_warn "Status: Premine done. Register MNs, then run 'bootstrap_testnet.sh block2'"
-    elif [ "$height" -eq 2 ]; then
-        if [ "$mn_count" -gt 0 ]; then
-            log_success "Status: Bootstrap complete! DMM active at Block 3."
-        else
-            log_warn "Status: Block 2 exists but no MNs. DMM cannot produce blocks."
-        fi
-    else
-        log_success "Status: Chain running. Height=$height, MNs=$mn_count"
+    if ! $CLI getblockcount > /dev/null 2>&1; then
+        log_error "Daemon not running"
+        exit 1
     fi
 
-    log_info "=========================================="
+    local height=$($CLI getblockcount)
+    local mn_count=$($CLI getmasternodecount | jq '.total' 2>/dev/null || echo "0")
+
+    log_info "Block height: $height"
+    log_info "Masternode count: $mn_count"
+
+    if [ "$mn_count" -ge 3 ]; then
+        log_success "DMM should be active"
+    else
+        log_warn "DMM requires 3 MNs, currently have $mn_count"
+    fi
+
+    log_info ""
+    log_info "Registered masternodes:"
+    $CLI protx_list valid | jq '.[].dmnstate | {service, registeredHeight}'
 }
 
 # ============================================================================
-# Main
+# USAGE
 # ============================================================================
 usage() {
+    echo "PIV2 Testnet Bootstrap Script v2.0"
+    echo ""
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  premine   - Generate Block 1 (premine with MN collateral)"
-    echo "  register  - Register 3 bootstrap masternodes (requires premine keys)"
-    echo "  block2    - Generate Block 2 (includes ProRegTx from mempool)"
-    echo "  status    - Show bootstrap status"
-    echo "  all       - Run full bootstrap (premine -> register -> block2)"
+    echo "  full     - Run full bootstrap (clean start)"
+    echo "  status   - Show current status"
+    echo "  help     - Show this help"
     echo ""
     echo "Environment variables:"
-    echo "  PIV2_CLI  - Path to piv2-cli (default: ./src/piv2-cli)"
-    echo "  PIV2D     - Path to piv2d (default: ./src/piv2d)"
-    echo "  DATADIR   - Data directory (default: ~/.piv2)"
+    echo "  DATADIR  - Data directory (default: /tmp/piv2_bootstrap)"
+    echo "  PIV2_CLI - Path to piv2-cli"
+    echo "  PIV2D    - Path to piv2d"
 }
 
-case "${1:-status}" in
-    premine)
-        check_daemon
-        generate_premine
-        ;;
-    register)
-        check_daemon
-        register_masternodes
-        ;;
-    block2)
-        check_daemon
-        generate_block2
+# ============================================================================
+# MAIN
+# ============================================================================
+case "${1:-help}" in
+    full)
+        full_bootstrap
         ;;
     status)
-        check_daemon
         show_status
         ;;
-    all)
-        check_daemon
-        generate_premine
-        register_masternodes
-        generate_block2
-        show_status
+    help|--help|-h)
+        usage
         ;;
     *)
         usage

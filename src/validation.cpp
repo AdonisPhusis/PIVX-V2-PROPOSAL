@@ -832,19 +832,26 @@ double ConvertBitsToDouble(unsigned int nBits)
 
 CAmount GetBlockValue(int nHeight)
 {
-    // HU Chain: Zero block reward on mainnet/testnet
-    // Economy governed entirely by:
-    //   - Genesis allocation (initial supply)
-    //   - R% yield on ZKHU locks
-    //   - Fee burn mechanism
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PIV2 Block Reward Policy
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MAINNET: Zero block reward (economy via R% yield on ZKHU)
+    // TESTNET/REGTEST: Block 1 premine simulates snapshot import
+    // ═══════════════════════════════════════════════════════════════════════════
 
-    // REGTEST ONLY: Bootstrap reward for local testing
-    // First 500 blocks get 1000 HU each = 500,000 HU total
-    // This simulates the genesis allocation for test purposes
-    if (Params().IsRegTestNet() && nHeight > 0 && nHeight <= 500) {
-        return 1000 * COIN;  // 1000 HU per block
+    // Block 1 Premine (Testnet): 100,030,000 PIV2
+    // Simulates snapshot import - creates spendable UTXO at block 1
+    if (nHeight == 1 && Params().IsTestnet()) {
+        return 100030000 * COIN;  // 3×10K MN + 50M Dev + 50M Faucet
     }
 
+    // Block 1 Premine (Regtest): 50,030,300 PIV2
+    if (nHeight == 1 && Params().IsRegTestNet()) {
+        return 50030300 * COIN;  // 50M Test + 300 MN + 30K Ops
+    }
+
+    // All other blocks: Zero reward
+    // Mainnet has no block reward - economy governed by R% yield
     return 0;
 }
 
@@ -1062,10 +1069,19 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         assert(!coin.IsSpent());
 
         if (coin.IsCoinBase()) {
-            // HU REGTEST EXCEPTION: Genesis block (height 0) coinbase outputs are immediately spendable
-            // This allows instant masternode registration without waiting for maturity
-            // Only applies to regtest network for fast testing
-            bool bSkipMaturity = (::Params().IsRegTestNet() && coin.nHeight == 0);
+            // ═══════════════════════════════════════════════════════════════════════════
+            // PIV2 Bootstrap: Skip maturity for Block 1 premine (testnet/regtest)
+            // ═══════════════════════════════════════════════════════════════════════════
+            // Block 1 contains premine outputs (MN collateral + Dev + Faucet)
+            // Block 2 needs to spend these for ProRegTx (MN registration)
+            // Without this exception, we'd have to wait 10 blocks for maturity
+            // ═══════════════════════════════════════════════════════════════════════════
+            bool bSkipMaturity = false;
+            if (::Params().IsRegTestNet() && coin.nHeight <= 1) {
+                bSkipMaturity = true;  // Regtest: Genesis (0) and Block 1 immediately spendable
+            } else if (::Params().IsTestnet() && coin.nHeight == 1) {
+                bSkipMaturity = true;  // Testnet: Block 1 premine immediately spendable
+            }
             if (!bSkipMaturity && (signed long)nSpendHeight - coin.nHeight < (signed long)Consensus::Params::HU_COINBASE_MATURITY)
                 return state.Invalid(false, REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
                         strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));

@@ -83,6 +83,71 @@ CMutableTransaction CreateCoinbaseTx(const CScript& scriptPubKeyIn, CBlockIndex*
     assert(pindexPrev);
     const int nHeight = pindexPrev->nHeight + 1;
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PIV2 Block 1 Premine (Testnet/Regtest only)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Genesis coinbase is NOT spendable (Bitcoin design), so we distribute initial
+    // supply at Block 1. These outputs ARE spendable after HU_COINBASE_MATURITY.
+    // Uses same addresses as genesis MN config for consistency.
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (nHeight == 1 && (Params().IsTestnet() || Params().IsRegTestNet())) {
+        CMutableTransaction txCoinbase;
+        txCoinbase.vin.emplace_back();
+        txCoinbase.vin[0].scriptSig = CScript() << nHeight << OP_0;
+
+        if (Params().IsTestnet()) {
+            // TESTNET Premine: 100,030,000 PIV2
+            // Output 0: MN1 Collateral (10,000 PIV2) - pubKeyHash from genesis
+            // Output 1: MN2 Collateral (10,000 PIV2)
+            // Output 2: MN3 Collateral (10,000 PIV2)
+            // Output 3: Dev Wallet (50,000,000 PIV2)
+            // Output 4: Faucet (50,000,000 PIV2)
+            txCoinbase.vout.resize(5);
+
+            txCoinbase.vout[0].nValue = 10000 * COIN;
+            txCoinbase.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("87060609b12d797fd2396629957fde4a3d3adbff") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            txCoinbase.vout[1].nValue = 10000 * COIN;
+            txCoinbase.vout[1].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("2563dfb22c186e7d2741ed6d785856f7f17e187a") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            txCoinbase.vout[2].nValue = 10000 * COIN;
+            txCoinbase.vout[2].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("dd2ba22aec7280230ff03da61b7141d7acf12edd") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            txCoinbase.vout[3].nValue = 50000000 * COIN;
+            txCoinbase.vout[3].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("197cf6a11f4214b4028389c77b90f27bc90dc839") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            txCoinbase.vout[4].nValue = 50000000 * COIN;
+            txCoinbase.vout[4].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("ec1ab14139850ef2520199c49ba1e46656c9e84f") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            LogPrintf("PIV2 Block 1 Premine: 100,030,000 PIV2 distributed (3×MN + Dev + Faucet)\n");
+        } else {
+            // REGTEST Premine: 50,030,300 PIV2 (simplified)
+            // Output 0: Test Wallet (50,000,000 PIV2)
+            // Output 1-3: MN1-3 Collateral (100 PIV2 each on regtest)
+            // Output 4: Ops Fund (30,000 PIV2)
+            txCoinbase.vout.resize(5);
+
+            txCoinbase.vout[0].nValue = 50000000 * COIN;
+            txCoinbase.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("63d31c01f548cc5d314cf692f727157475b9d4a9") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            txCoinbase.vout[1].nValue = 100 * COIN;
+            txCoinbase.vout[1].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("4e7875de8946177c9fd5fc55fcbc54a34c8a4ab9") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            txCoinbase.vout[2].nValue = 100 * COIN;
+            txCoinbase.vout[2].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("7c65f3ec8f1c70b7d8e5f9a7b3c8d9e0f1a2b3c4") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            txCoinbase.vout[3].nValue = 100 * COIN;
+            txCoinbase.vout[3].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("8d76f4fd9f2d81c8e9f6a8b4c9d0e1f2a3b4c5d6") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            txCoinbase.vout[4].nValue = 30000 * COIN;
+            txCoinbase.vout[4].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("9e87f5fe0f3e92d9f0f7b9c5d0e2f3a4b5c6d7e8") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+            LogPrintf("PIV2 Block 1 Premine: 50,030,300 PIV2 distributed (regtest)\n");
+        }
+
+        return txCoinbase;
+    }
+
     // Create coinbase tx
     CMutableTransaction txCoinbase = NewCoinbase(nHeight, &scriptPubKeyIn);
 

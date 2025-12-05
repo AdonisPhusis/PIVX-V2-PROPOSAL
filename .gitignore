@@ -192,3 +192,6 @@ src/qt/piv2-qt
 src/qt/test/test_piv2-qt
 src/bench/bench_pivx
 src/test/test_pivx
+# Private keys - NEVER commit
+contrib/testnet/register_bootstrap_mns.sh
+.piv2_keys/

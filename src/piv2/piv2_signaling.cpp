@@ -377,10 +377,16 @@ bool PreviousBlockHasQuorum(const CBlockIndex* pindexPrev)
 
     const Consensus::Params& consensus = Params().GetConsensus();
 
-    // Only genesis block (height 0) is exempt from quorum check
-    // Block 1+ requires quorum signatures from MNs
-    if (pindexPrev->nHeight < 1) {
-        return true;
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PIV2 Bootstrap Exception: Blocks 0, 1, 2 exempt from quorum
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Block 0 (Genesis): No MNs exist yet (empty coinbase)
+    // Block 1 (Premine): Spendable UTXO created (MN collateral + Dev + Faucet)
+    // Block 2 (ProRegTx): MNs register with real collateral from Block 1
+    // Block 3+: Requires quorum (2/3 signatures) on previous block
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (pindexPrev->nHeight < 3) {
+        return true;  // Blocks 0, 1, 2 exempt - MNs not yet active
     }
 
     // Check if previous block has quorum

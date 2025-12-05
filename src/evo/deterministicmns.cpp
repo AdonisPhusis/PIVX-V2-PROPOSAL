@@ -678,10 +678,26 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
         // this works on the previous block, so confirmation will happen one block after nMasternodeMinimumConfirmations
         // has been reached, but the block hash will then point to the block at nMasternodeMinimumConfirmations
         int nConfirmations = pindexPrev->nHeight - dmn->pdmnState->nRegisteredHeight;
-        if (nConfirmations >= consensus.MasternodeCollateralMinConf()) {
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // PIV2 Bootstrap Exception: MNs registered at Block 2 are confirmed immediately
+        // ═══════════════════════════════════════════════════════════════════════════
+        // Block 0 = Genesis (no MNs)
+        // Block 1 = Premine (collateral created)
+        // Block 2 = ProRegTx (MNs registered) - need immediate confirmation
+        // Block 3+ = DMM active (MNs must be confirmed to produce blocks)
+        // Without this exception, MNs would wait nMasternodeCollateralMinConf blocks
+        // ═══════════════════════════════════════════════════════════════════════════
+        bool bBootstrapMN = (dmn->pdmnState->nRegisteredHeight <= 2);
+
+        if (bBootstrapMN || nConfirmations >= consensus.MasternodeCollateralMinConf()) {
             auto newState = std::make_shared<CDeterministicMNState>(*dmn->pdmnState);
             newState->UpdateConfirmedHash(dmn->proTxHash, pindexPrev->GetBlockHash());
             newList.UpdateMN(dmn->proTxHash, newState);
+            if (bBootstrapMN && nConfirmations < consensus.MasternodeCollateralMinConf()) {
+                LogPrintf("DMN: Bootstrap MN %s confirmed immediately at block %d (registered at %d)\n",
+                          dmn->proTxHash.ToString().substr(0, 16), pindexPrev->nHeight + 1, dmn->pdmnState->nRegisteredHeight);
+            }
         }
     });
 

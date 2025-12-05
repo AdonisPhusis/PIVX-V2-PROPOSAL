@@ -277,11 +277,67 @@ UniValue generate(const JSONRPCRequest& request)
     return generateBlocks(nGenerate, coinbaseScript);
 }
 
+UniValue generatebootstrap(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
+            "generatebootstrap ( nblocks )\n"
+            "\n[TESTNET/REGTEST ONLY] Generate bootstrap blocks for PIV2 network initialization.\n"
+            "This command generates blocks 1 and 2 (premine + ProRegTx blocks) before DMM activates.\n"
+            "Block 1 = Premine (MN collateral + Dev wallet + Faucet)\n"
+            "Block 2 = Empty block (for ProRegTx to be included)\n"
+            "Block 3+ = DMM active (masternodes produce blocks)\n"
+            "\nArguments:\n"
+            "1. nblocks      (numeric, optional, default=2) Number of bootstrap blocks to generate (max 2).\n"
+            "\nResult:\n"
+            "[blockhash, ...]  (array) Array of hashes of blocks generated\n"
+            "\nExamples:\n"
+            "\nGenerate bootstrap blocks 1 and 2\n" +
+            HelpExampleCli("generatebootstrap", "") +
+            HelpExampleRpc("generatebootstrap", ""));
+
+    // Only allowed on testnet and regtest
+    if (!Params().IsTestnet() && !Params().IsRegTestNet())
+        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "generatebootstrap is only available on testnet/regtest.");
+
+    // Check current height
+    int nCurrentHeight;
+    {
+        LOCK(cs_main);
+        nCurrentHeight = chainActive.Height();
+    }
+
+    // Only allowed at genesis (height 0) - blocks 1 and 2 not yet created
+    if (nCurrentHeight > 1)
+        throw JSONRPCError(RPC_MISC_ERROR, strprintf("Bootstrap already complete. Current height: %d. Bootstrap only works at height 0 or 1.", nCurrentHeight));
+
+    int nGenerate = 2;  // Default: generate blocks 1 and 2
+    if (request.params.size() > 0 && !request.params[0].isNull()) {
+        nGenerate = request.params[0].get_int();
+        if (nGenerate <= 0 || nGenerate > 2)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid number of blocks. Max 2 for bootstrap.");
+    }
+
+    // Adjust based on current height
+    if (nCurrentHeight == 1) {
+        nGenerate = 1;  // Only block 2 left to generate
+    }
+
+    // Use OP_TRUE script for bootstrap blocks (no specific destination needed)
+    // Block 1 coinbase is already defined in blockassembler.cpp with premine outputs
+    CScript coinbaseScript = CScript() << OP_TRUE;
+
+    LogPrintf("PIV2 Bootstrap: Generating %d bootstrap block(s) starting from height %d\n", nGenerate, nCurrentHeight + 1);
+
+    return generateBlocks(nGenerate, coinbaseScript);
+}
+
 // clang-format off
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafe argNames
   //  --------------------- ------------------------  -----------------------  ------ --------
     { "generating",         "generate",               &generate,               true,  {"nblocks","address"} },
+    { "generating",         "generatebootstrap",      &generatebootstrap,      true,  {"nblocks"} },
     { "util",               "estimatefee",            &estimatefee,            true,  {"nblocks"} },
     { "util",               "estimatesmartfee",       &estimatesmartfee,       true,  {"nblocks"} },
     { "blockchain",         "prioritisetransaction",  &prioritisetransaction,  true,  {"txid","fee_delta"} },

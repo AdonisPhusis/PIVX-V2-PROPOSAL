@@ -156,21 +156,26 @@ static CBlock CreatePIVHUGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t 
 }
 
 /**
- * PIVHU Testnet Genesis Block - Public test network
+ * PIV2 Testnet Genesis Block - Minimal (snapshot simulation)
  *
- * TESTNET Distribution (100,030,000 PIVHU total):
- * - MN1 Collateral:   10,000 PIVHU (masternode 1)
- * - MN2 Collateral:   10,000 PIVHU (masternode 2)
- * - MN3 Collateral:   10,000 PIVHU (masternode 3)
- * - Dev Wallet:   50,000,000 PIVHU (development/testing)
- * - Faucet:       50,000,000 PIVHU (public faucet for testers)
+ * Genesis coinbase is NOT spendable (Bitcoin design).
+ * Initial supply distributed at Block 1 via premine (simulates snapshot import).
  *
- * Testnet uses 3 masternodes minimum for DMM quorum testing.
- * Private keys are documented but NEVER used on mainnet.
+ * Block 0 (Genesis):
+ *   - Coinbase: 0 PIV2 (symbolic, not spendable)
+ *   - 3 MNs injected virtually into DMN list
+ *
+ * Block 1 (Premine):
+ *   - MN1 Collateral: 10,000 PIV2 (SPENDABLE)
+ *   - MN2 Collateral: 10,000 PIV2 (SPENDABLE)
+ *   - MN3 Collateral: 10,000 PIV2 (SPENDABLE)
+ *   - Dev Wallet: 50,000,000 PIV2 (SPENDABLE)
+ *   - Faucet: 50,000,000 PIV2 (SPENDABLE)
+ *   Total: 100,030,000 PIV2
  */
 static CBlock CreatePIVHUTestnetGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion)
 {
-    const char* pszTimestamp = "PIVHU Testnet Dec 2025 - Knowledge Hedge Unit - 3 MN DMM Genesis v3";
+    const char* pszTimestamp = "PIV2 Testnet Dec 2025 - Snapshot Genesis v4 - DMM from Block 1";
 
     CMutableTransaction txNew;
     txNew.nVersion = 1;
@@ -178,52 +183,15 @@ static CBlock CreatePIVHUTestnetGenesisBlock(uint32_t nTime, uint32_t nNonce, ui
     txNew.vin[0].scriptSig = CScript() << 486604799 << CScriptNum(4) << std::vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // PIVHU Testnet Distribution - P2PKH outputs
+    // PIV2 Testnet Genesis - MINIMAL coinbase (0 PIV2)
     // ═══════════════════════════════════════════════════════════════════════════
-    //
-    // Testnet addresses (base58 prefix 139 = 'x' or 'y')
-    // Private keys will be generated via RPC and documented separately
-    //
-    // Output 0: MN1 Collateral (10,000 HU)
-    // Output 1: MN2 Collateral (10,000 HU)
-    // Output 2: MN3 Collateral (10,000 HU)
-    // Output 3: Dev Wallet (50,000,000 HU)
-    // Output 4: Faucet (50,000,000 HU)
-    //
-    // Total: 100,030,000 HU
-    //
+    // Genesis coinbase is NOT spendable by Bitcoin design.
+    // All real supply comes from Block 1 premine (snapshot simulation).
+    // This output exists only because a coinbase tx must have at least 1 output.
     // ═══════════════════════════════════════════════════════════════════════════
-
-    txNew.vout.resize(5);
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // PIV2 Testnet Genesis Keys - Generated 2025-12-04
-    // ═══════════════════════════════════════════════════════════════════════
-    //
-    // Output 0: MN1 Collateral (10,000 PIV2)
-    //   pubKeyHash: 87060609b12d797fd2396629957fde4a3d3adbff
-    txNew.vout[0].nValue = 10000 * COIN;
-    txNew.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("87060609b12d797fd2396629957fde4a3d3adbff") << OP_EQUALVERIFY << OP_CHECKSIG;
-
-    // Output 1: MN2 Collateral (10,000 PIV2)
-    //   pubKeyHash: 2563dfb22c186e7d2741ed6d785856f7f17e187a
-    txNew.vout[1].nValue = 10000 * COIN;
-    txNew.vout[1].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("2563dfb22c186e7d2741ed6d785856f7f17e187a") << OP_EQUALVERIFY << OP_CHECKSIG;
-
-    // Output 2: MN3 Collateral (10,000 PIV2)
-    //   pubKeyHash: dd2ba22aec7280230ff03da61b7141d7acf12edd
-    txNew.vout[2].nValue = 10000 * COIN;
-    txNew.vout[2].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("dd2ba22aec7280230ff03da61b7141d7acf12edd") << OP_EQUALVERIFY << OP_CHECKSIG;
-
-    // Output 3: Dev Wallet (50,000,000 PIV2)
-    //   pubKeyHash: 197cf6a11f4214b4028389c77b90f27bc90dc839
-    txNew.vout[3].nValue = 50000000 * COIN;
-    txNew.vout[3].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("197cf6a11f4214b4028389c77b90f27bc90dc839") << OP_EQUALVERIFY << OP_CHECKSIG;
-
-    // Output 4: Faucet (50,000,000 PIV2)
-    //   pubKeyHash: ec1ab14139850ef2520199c49ba1e46656c9e84f
-    txNew.vout[4].nValue = 50000000 * COIN;
-    txNew.vout[4].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("ec1ab14139850ef2520199c49ba1e46656c9e84f") << OP_EQUALVERIFY << OP_CHECKSIG;
+    txNew.vout.resize(1);
+    txNew.vout[0].nValue = 0;  // 0 PIV2 - symbolic only
+    txNew.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("0000000000000000000000000000000000000000") << OP_EQUALVERIFY << OP_CHECKSIG;
 
     CBlock genesis;
     genesis.vtx.push_back(std::make_shared<const CTransaction>(std::move(txNew)));
@@ -410,6 +378,10 @@ public:
         // ZKHU lock maturity: 3 days before yield accrues
         consensus.nZKHUMaturityBlocks = 4320;       // 3 days × 1440 blocks/day
 
+        // Masternode collateral maturity: 3 days (prevents quorum manipulation)
+        // This delay prevents rapid MN registration/deregistration attacks
+        consensus.nMasternodeCollateralMinConf = 4320;  // 3 days × 1440 blocks/day
+
         // ═══════════════════════════════════════════════════════════════════════
         // SYNCHRONIZED DOMC + DAO GOVERNANCE (3 months / 1 month)
         // ═══════════════════════════════════════════════════════════════════════
@@ -556,26 +528,24 @@ public:
         strNetworkID = "piv2-testnet";
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PIVHU Testnet Genesis - FINAL
+        // PIV2 Testnet Genesis v4 - Minimal (snapshot simulation)
         // ═══════════════════════════════════════════════════════════════════════
-        // Timestamp: Dec 2025 (1733270400)
-        // Keys generated: 2025-12-03
-        // nNonce mined: 69256
-        // Distribution:
-        //   Output 0: MN1 Collateral - 10,000 HU
-        //   Output 1: MN2 Collateral - 10,000 HU
-        //   Output 2: MN3 Collateral - 10,000 HU
-        //   Output 3: Dev Wallet - 50,000,000 HU
-        //   Output 4: Faucet - 50,000,000 HU
-        // Total: 100,030,000 HU
+        // Genesis coinbase: 0 PIV2 (not spendable by Bitcoin design)
+        // Block 1 premine: 100,030,000 PIV2 (simulates snapshot import)
+        //   - MN1/2/3 Collateral: 3 × 10,000 PIV2
+        //   - Dev Wallet: 50,000,000 PIV2
+        //   - Faucet: 50,000,000 PIV2
+        // 3 MNs injected virtually into DMN list at genesis
         // ═══════════════════════════════════════════════════════════════════════
-        // PIV2 Testnet Genesis - v3 mined 2025-12-05 with fresh timestamp for DMM bootstrap
-        genesis = CreatePIVHUTestnetGenesisBlock(1764892800, 523385, 0x1e0ffff0, 1);
+        // Note: nNonce needs to be mined - will be done at first launch
+        genesis = CreatePIVHUTestnetGenesisBlock(1733443200, 0, 0x1e0ffff0, 1);  // Dec 6, 2025
         consensus.hashGenesisBlock = genesis.GetHash();
 
-        // Genesis validation - v3 mined 2025-12-05 by C++ MineGenesisBlock
-        assert(consensus.hashGenesisBlock == uint256S("0x00000b7a70dec14ae970c1be025fd15ff82afae417618a162a879b545025cb66"));
-        assert(genesis.hashMerkleRoot == uint256S("0x482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74"));
+        // Genesis will be mined at first launch (MineGenesisBlock)
+        // Temporarily disable hash assertions until genesis is mined
+        // TODO: Uncomment after mining genesis with correct nNonce
+        // assert(consensus.hashGenesisBlock == uint256S("0x..."));
+        // assert(genesis.hashMerkleRoot == uint256S("0x..."));
 
         // ═══════════════════════════════════════════════════════════════════════
         // HU Core Economic Parameters - TESTNET
@@ -598,6 +568,9 @@ public:
 
         // ZKHU Staking maturity: ~1 hour before yield accrues
         consensus.nZKHUMaturityBlocks = 60;         // 1 hour × 1 block/min
+
+        // Masternode collateral maturity: 1 hour (faster testing)
+        consensus.nMasternodeCollateralMinConf = 60;  // 1 hour × 1 block/min
 
         // ═══════════════════════════════════════════════════════════════════════
         // SYNCHRONIZED DOMC + DAO GOVERNANCE (TESTNET: 3 days / 1 day)
@@ -674,52 +647,15 @@ public:
                 Consensus::NetworkUpgrade::ALWAYS_ACTIVE;  // KHU active from genesis
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PIV2 Genesis Masternodes - Testnet Bootstrap v3
-        // These MNs are injected at block 0 to enable DMM block production
-        // without the "egg and chicken" problem of needing blocks to register MNs
-        // and needing MNs to produce blocks.
+        // PIV2 Genesis Masternodes - REMOVED (v5)
         // ═══════════════════════════════════════════════════════════════════════
-        // Keys generated: 2025-12-04 via regtest key derivation
-        // Genesis v3 mined: 2025-12-05 by C++ MineGenesisBlock
-        // Genesis hash: 00000b7a70dec14ae970c1be025fd15ff82afae417618a162a879b545025cb66
-        // Coinbase txid (merkle root): 482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74
-        // VPS IPs: 57.131.33.151, 57.131.33.152, 57.131.33.214
+        // No virtual MNs at genesis. Block 1 is a special bootstrap block that:
+        // 1. Can be produced without MN (exception)
+        // 2. Contains premine coinbase with MN collateral UTXO
+        // 3. Contains ProRegTx to register MNs with real collateral
+        // After block 1, DMM requires registered MNs with quorum.
         // ═══════════════════════════════════════════════════════════════════════
-        consensus.genesisMNs = {
-            // MN1 - VPS 57.131.33.151
-            {
-                "3ad46ebd38a363ecf2870e80c33d9544fdb6ef88f8accdd9f9b8a9b4825824d8",  // proTxHash (synthetic: sha256(sha256("genesis_mn_0_" + genesis_hash)))
-                "482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74",  // collateralTxHash (genesis coinbase)
-                0,  // collateralIndex (output 0)
-                "87060609b12d797fd2396629957fde4a3d3adbff",  // ownerKeyID
-                "02841677a39503313fb368490d1e817ee46ce78de803ef26cc684f773bfe510730",  // operatorPubKey
-                "87060609b12d797fd2396629957fde4a3d3adbff",  // votingKeyID (same as owner)
-                "57.131.33.151:27171",  // serviceAddr
-                "76a91487060609b12d797fd2396629957fde4a3d3adbff88ac"  // payoutAddress (P2PKH)
-            },
-            // MN2 - VPS 57.131.33.152
-            {
-                "a0b733c1c804a1afc171f1994a72e2202183fab854dbf05c7e84072cf06d7d8d",  // proTxHash (synthetic: sha256(sha256("genesis_mn_1_" + genesis_hash)))
-                "482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74",  // collateralTxHash (genesis coinbase)
-                1,  // collateralIndex (output 1)
-                "2563dfb22c186e7d2741ed6d785856f7f17e187a",  // ownerKeyID
-                "02e6133571bcde14ef46f7d332cb517e273e66dafe886e2792e650a36da3e41392",  // operatorPubKey (WIF: cW1vzmUdmkKxSz24jjW6nciTo98V1odocKF4X7gaT5g92hwNwWmW)
-                "2563dfb22c186e7d2741ed6d785856f7f17e187a",  // votingKeyID (same as owner)
-                "57.131.33.152:27171",  // serviceAddr
-                "76a9142563dfb22c186e7d2741ed6d785856f7f17e187a88ac"  // payoutAddress (P2PKH)
-            },
-            // MN3 - VPS 57.131.33.214
-            {
-                "1052ddb976fdc6b3839fded3eb7f253911560779c991cba65a30f40242ffddb9",  // proTxHash (synthetic: sha256(sha256("genesis_mn_2_" + genesis_hash)))
-                "482105bd7541476193efce04deb39e7f0f75dfa7d5b25503e0a7eca58c103c74",  // collateralTxHash (genesis coinbase)
-                2,  // collateralIndex (output 2)
-                "dd2ba22aec7280230ff03da61b7141d7acf12edd",  // ownerKeyID
-                "030867eff81e9210f23ae4b0df4282cfdd254e4c7357e59370f40171af1587a9ea",  // operatorPubKey (WIF: cQ9Fsq7xcN5z89JVH5fwT1qXg2sosT4GkPumFqU9XzuD5PkgeD6k)
-                "dd2ba22aec7280230ff03da61b7141d7acf12edd",  // votingKeyID (same as owner)
-                "57.131.33.214:27171",  // serviceAddr
-                "76a914dd2ba22aec7280230ff03da61b7141d7acf12edd88ac"  // payoutAddress (P2PKH)
-            }
-        };
+        consensus.genesisMNs = {};  // Empty - MNs registered at block 1
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -815,6 +751,9 @@ public:
 
         // ZKHU Staking maturity: 10 blocks (instant for testing)
         consensus.nZKHUMaturityBlocks = 10;         // ~10 minutes
+
+        // Masternode collateral maturity: 1 block (instant for testing)
+        consensus.nMasternodeCollateralMinConf = 1;  // Immediate for regtest
 
         // DOMC cycle: 90 blocks = 3 × DAO cycle (synchronized)
         consensus.nDOMCCycleBlocks = 90;            // 3 × 30 = 90 blocks

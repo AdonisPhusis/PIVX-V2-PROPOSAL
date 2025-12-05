@@ -67,8 +67,20 @@ bool CheckBlockSignature(const CBlock& block)
         return true;
     }
 
-    // PIV2: No bootstrap phase - all blocks must be signed from block 1
-    // Genesis MNs are injected at block 0, so DMM can produce signed blocks immediately
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PIV2 Bootstrap: Blocks 1 and 2 exempt from signature (no MNs active yet)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Block 1 (Premine): Creates spendable UTXO for MN collateral
+    // Block 2 (ProRegTx): MNs register with real collateral from Block 1
+    // Block 3+: Requires MN signature (DMM active)
+    // ═══════════════════════════════════════════════════════════════════════════
+    {
+        LOCK(cs_main);
+        auto it = mapBlockIndex.find(block.hashPrevBlock);
+        if (it != mapBlockIndex.end() && it->second->nHeight < 2) {
+            return true;  // Blocks 1 and 2 - bootstrap phase, no MN signature required
+        }
+    }
 
     if (block.vchBlockSig.empty())
         return error("%s: vchBlockSig is empty!", __func__);

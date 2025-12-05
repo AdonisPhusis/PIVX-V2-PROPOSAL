@@ -643,8 +643,13 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
                     continue;
                 const Coin &coin = pcoins->AccessCoin(txin.prevout);
                 if (nCheckFrequency != 0) assert(!coin.IsSpent());
-                // HU REGTEST EXCEPTION: Genesis block (height 0) coinbase outputs are immediately spendable
-                bool bSkipMaturity = (Params().IsRegTestNet() && coin.nHeight == 0);
+                // PIV2 Bootstrap: Skip maturity for Block 1 premine (testnet/regtest)
+                bool bSkipMaturity = false;
+                if (Params().IsRegTestNet() && coin.nHeight <= 1) {
+                    bSkipMaturity = true;  // Regtest: Genesis (0) and Block 1 immediately spendable
+                } else if (Params().IsTestnet() && coin.nHeight == 1) {
+                    bSkipMaturity = true;  // Testnet: Block 1 premine immediately spendable
+                }
                 if (coin.IsSpent() || (coin.IsCoinBase() && !bSkipMaturity && ((signed long)nMemPoolHeight) - coin.nHeight < (signed long)Consensus::Params::HU_COINBASE_MATURITY)) {
                     txToRemove.insert(it);
                     break;

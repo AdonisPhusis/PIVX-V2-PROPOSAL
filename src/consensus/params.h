@@ -200,8 +200,16 @@ struct Params {
     int64_t TargetTimespan(const bool fV2 = true) const { return fV2 ? nTargetTimespanV2 : nTargetTimespan; }
     bool MoneyRange(const CAmount& nValue) const { return (nValue >= 0 && nValue <= nMaxMoneyOut); }
     bool IsTimeProtocolV2(const int nHeight) const { return NetworkUpgradeActive(nHeight, UPGRADE_V4_0); }
-    // HU: MN collateral requires 1 confirmation (simple check)
-    static constexpr int MasternodeCollateralMinConf() { return 1; }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PIV2 Masternode Collateral Maturity
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Prevents rapid MN registration/deregistration attacks on quorum
+    // Values are set per-network in chainparams.cpp
+    // ═══════════════════════════════════════════════════════════════════════════
+    int nMasternodeCollateralMinConf{1};  // Default, overridden per network
+
+    int MasternodeCollateralMinConf() const { return nMasternodeCollateralMinConf; }
 
     int FutureBlockTimeDrift(const int nHeight) const
     {

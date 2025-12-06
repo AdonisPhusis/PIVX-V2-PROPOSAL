@@ -241,5 +241,5 @@ ssh -i $SSH_KEY ubuntu@<IP>
 
 ## See Also
 
-- [BLUEPRINT_DMM_HU.md](./BLUEPRINT_DMM_HU.md) - DMM and HU Finality architecture
-- [BLUEPRINT_COLDSYNC.md](./BLUEPRINT_COLDSYNC.md) - Cold start sync behavior
+- [BLUEPRINT_DMM_HU.md](./BLUEPRINT_DMM_HU.md) - DMM and HU Finality architecture (includes nDMMBootstrapHeight documentation)
+- [01-ARCHITECTURE.md](./01-ARCHITECTURE.md) - Overall PIV2 architecture

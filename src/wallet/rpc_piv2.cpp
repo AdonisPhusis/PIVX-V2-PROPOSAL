@@ -184,13 +184,14 @@ static UniValue khubalance(const JSONRPCRequest& request)
 
     CAmount nPendingYield = GetKHUPendingYieldEstimate(pwallet, R_annual);
 
-    // PIVHU balances (base coin, for fees)
-    // Note: GetAvailableBalance() includes KHU UTXOs (colored coins)
-    // Real PIVHU available = total - KPIVX V2 transparent balance
-    CAmount nPIVHUTotal = pwallet->GetAvailableBalance();
-    CAmount nPIVHUAvailable = nPIVHUTotal - nTransparent;  // Exclude KHU collateral
-    CAmount nPIVHUImmature = pwallet->GetImmatureBalance();
-    CAmount nPIVHULocked = pwallet->GetLockedCoins();
+    // PIV2 balances (base coin, for fees)
+    // Note: GetAvailableBalance() now correctly excludes KHU_MINT outputs (colored coins)
+    CAmount nPIV2Available = pwallet->GetAvailableBalance();
+    CAmount nPIV2Immature = pwallet->GetImmatureBalance();
+    CAmount nPIV2Locked = pwallet->GetLockedCoins();  // MN collateral locks
+
+    // Total wallet value = PIV2 + KHU_T + ZKHU
+    CAmount nTotalWallet = nPIV2Available + nTransparent + nLocked;
 
     // Build KHU object
     UniValue khuObj(UniValue::VOBJ);
@@ -201,16 +202,24 @@ static UniValue khubalance(const JSONRPCRequest& request)
     khuObj.pushKV("utxo_count", (int64_t)pwallet->khuData.mapKHUCoins.size());
     khuObj.pushKV("note_count", (int64_t)GetUnspentZKHUNotes(pwallet).size());
 
-    // Build PIVHU object (base coin)
-    UniValue pivhuObj(UniValue::VOBJ);
-    pivhuObj.pushKV("available", ValueFromAmount(nPIVHUAvailable));
-    pivhuObj.pushKV("immature", ValueFromAmount(nPIVHUImmature));
-    pivhuObj.pushKV("locked", ValueFromAmount(nPIVHULocked));
+    // Build PIV2 object (base coin - liquid PIV2 for fees)
+    UniValue piv2Obj(UniValue::VOBJ);
+    piv2Obj.pushKV("available", ValueFromAmount(nPIV2Available));
+    piv2Obj.pushKV("immature", ValueFromAmount(nPIV2Immature));
+    piv2Obj.pushKV("locked_collateral", ValueFromAmount(nPIV2Locked));  // MN collateral
+
+    // Build wallet summary (unified view)
+    UniValue walletObj(UniValue::VOBJ);
+    walletObj.pushKV("total", ValueFromAmount(nTotalWallet));
+    walletObj.pushKV("piv2_spendable", ValueFromAmount(nPIV2Available));
+    walletObj.pushKV("khu_transparent", ValueFromAmount(nTransparent));
+    walletObj.pushKV("khu_staked", ValueFromAmount(nLocked));
 
     // Build result
     UniValue result(UniValue::VOBJ);
+    result.pushKV("wallet", walletObj);  // Unified view first
     result.pushKV("khu", khuObj);
-    result.pushKV("pivhu", pivhuObj);
+    result.pushKV("piv2", piv2Obj);
 
     return result;
 }
@@ -2208,6 +2217,257 @@ static UniValue khulistlocked(const JSONRPCRequest& request)
     return results;
 }
 
+/**
+ * getauditstate - Complete monetary audit with supply breakdown and invariant verification
+ *
+ * Shows global supply state with clear breakdown:
+ * - PIV2 total supply and distribution
+ * - KHU (minted from PIV2) breakdown
+ * - ZKHU (staked KHU) with yield info
+ * - All economic invariants
+ * - Global alarm status
+ */
+static UniValue khuauditstate(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 0) {
+        throw std::runtime_error(
+            "getauditstate\n"
+            "\nComplete monetary audit showing global supply state and invariant verification.\n"
+            "\nThis command provides full visibility into the monetary system:\n"
+            "- Global supply breakdown (PIV2, KHU, ZKHU)\n"
+            "- Yield and fee statistics\n"
+            "- Economic invariant checks\n"
+            "- Inflation monitoring\n"
+            "- Global alarm status\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getauditstate", "")
+            + HelpExampleRpc("getauditstate", "")
+        );
+    }
+
+    LOCK(cs_main);
+
+    int nHeight = chainActive.Height();
+
+    // Get current KHU state
+    HuGlobalState state;
+    bool hasState = GetCurrentKHUState(state);
+
+    // Initialize values from state
+    CAmount C = hasState ? state.C : 0;      // Total KHU collateral (PIV2 locked)
+    CAmount U = hasState ? state.U : 0;      // KHU transparent (spendable)
+    CAmount Z = hasState ? state.Z : 0;      // ZKHU staked (locked for yield)
+    CAmount Cr = hasState ? state.Cr : 0;    // Cumulative redeemed (KHU -> PIV2)
+    CAmount Ur = hasState ? state.Ur : 0;    // Cumulative unlocked (ZKHU -> KHU)
+    CAmount T = hasState ? state.T : 0;      // DAO Treasury balance
+    int R_annual = hasState ? state.R_annual : 4000;  // Annual yield rate in basis points
+
+    // Calculate supply metrics
+    // Genesis premine for testnet
+    CAmount genesisPremine = 500000 * COIN;
+    // Block rewards (estimate: 10 PIV2 per block after genesis)
+    CAmount blockRewards = (nHeight > 0) ? (nHeight - 1) * 10 * COIN : 0;
+    // Estimated total PIV2 supply
+    CAmount estimatedTotalSupply = genesisPremine + blockRewards;
+    // PIV2 liquid (not locked as KHU collateral, not in DAO treasury)
+    CAmount piv2Liquid = estimatedTotalSupply - C - T;  // Total - Collateral - DAO Treasury
+
+    // Calculate yield metrics
+    // Annual yield rate: R_annual basis points (e.g., 4000 = 40%)
+    double annualYieldPercent = R_annual / 100.0;
+    // Estimated daily yield on current ZKHU balance
+    CAmount dailyYieldEstimate = (Z * R_annual) / (365 * 10000);
+    // Estimated annual inflation from yield (if all ZKHU earns full year)
+    CAmount annualYieldInflation = (Z * R_annual) / 10000;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BUILD RESULT
+    // ═══════════════════════════════════════════════════════════════════════
+    UniValue result(UniValue::VOBJ);
+
+    // Header
+    result.pushKV("block_height", nHeight);
+    result.pushKV("timestamp", GetTime());
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 1. GLOBAL SUPPLY
+    // ═══════════════════════════════════════════════════════════════════════
+    UniValue globalSupply(UniValue::VOBJ);
+    globalSupply.pushKV("piv2_total_estimated", ValueFromAmount(estimatedTotalSupply));
+    globalSupply.pushKV("piv2_liquid", ValueFromAmount(piv2Liquid));
+    globalSupply.pushKV("piv2_locked_as_khu", ValueFromAmount(C));
+    globalSupply.pushKV("dao_treasury", ValueFromAmount(T));
+    result.pushKV("global_supply", globalSupply);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 2. KHU BREAKDOWN (Minted from PIV2)
+    // ═══════════════════════════════════════════════════════════════════════
+    UniValue khuState(UniValue::VOBJ);
+    khuState.pushKV("total_minted_C", ValueFromAmount(C));
+    khuState.pushKV("transparent_U", ValueFromAmount(U));
+    khuState.pushKV("staked_as_zkhu_Z", ValueFromAmount(Z));
+    khuState.pushKV("cumulative_redeemed_Cr", ValueFromAmount(Cr));
+    khuState.pushKV("formula", strprintf("C = U + Z : %s = %s + %s",
+        FormatMoney(C), FormatMoney(U), FormatMoney(Z)));
+    result.pushKV("khu_state", khuState);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 3. ZKHU & YIELD INFO
+    // ═══════════════════════════════════════════════════════════════════════
+    UniValue zkhuYield(UniValue::VOBJ);
+    zkhuYield.pushKV("zkhu_staked_Z", ValueFromAmount(Z));
+    zkhuYield.pushKV("cumulative_unlocked_Ur", ValueFromAmount(Ur));
+    zkhuYield.pushKV("annual_yield_rate_percent", annualYieldPercent);
+    zkhuYield.pushKV("annual_yield_rate_bps", R_annual);
+    zkhuYield.pushKV("estimated_daily_yield", ValueFromAmount(dailyYieldEstimate));
+    zkhuYield.pushKV("estimated_annual_yield_inflation", ValueFromAmount(annualYieldInflation));
+    zkhuYield.pushKV("formula", strprintf("Cr = Ur : %s = %s",
+        FormatMoney(Cr), FormatMoney(Ur)));
+    result.pushKV("zkhu_yield", zkhuYield);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 4. INVARIANTS CHECK
+    // ═══════════════════════════════════════════════════════════════════════
+    UniValue invariants(UniValue::VOBJ);
+    UniValue alerts(UniValue::VARR);
+    bool allInvariantsOk = true;
+
+    // Invariant 1: C == U + Z (Conservation of KHU)
+    bool inv1_ok = (C == U + Z);
+    invariants.pushKV("C_equals_U_plus_Z", inv1_ok);
+    if (!inv1_ok) {
+        allInvariantsOk = false;
+        CAmount diff = C - (U + Z);
+        std::string alert = strprintf("CRITICAL: KHU Conservation violated! C=%s != U+Z=%s (diff=%s)",
+            FormatMoney(C), FormatMoney(U + Z), FormatMoney(diff));
+        alerts.push_back(alert);
+        LogPrintf("AUDIT ALERT: %s\n", alert);
+    }
+
+    // Invariant 2: Cr == Ur (Redemption consistency)
+    bool inv2_ok = (Cr == Ur);
+    invariants.pushKV("Cr_equals_Ur", inv2_ok);
+    if (!inv2_ok) {
+        allInvariantsOk = false;
+        std::string alert = strprintf("CRITICAL: Redemption mismatch! Cr=%s != Ur=%s",
+            FormatMoney(Cr), FormatMoney(Ur));
+        alerts.push_back(alert);
+        LogPrintf("AUDIT ALERT: %s\n", alert);
+    }
+
+    // Invariant 3: No negative values
+    bool inv3_ok = (C >= 0 && U >= 0 && Z >= 0 && Cr >= 0 && Ur >= 0 && T >= 0);
+    invariants.pushKV("no_negative_values", inv3_ok);
+    if (!inv3_ok) {
+        allInvariantsOk = false;
+        alerts.push_back("CRITICAL: Negative value detected in monetary state!");
+        LogPrintf("AUDIT ALERT: Negative value in state!\n");
+    }
+
+    // Invariant 4: U <= C and Z <= C (Can't have more transparent/staked than minted)
+    bool inv4_ok = (U <= C && Z <= C);
+    invariants.pushKV("balances_within_bounds", inv4_ok);
+    if (!inv4_ok) {
+        allInvariantsOk = false;
+        alerts.push_back("CRITICAL: Balance exceeds collateral!");
+        LogPrintf("AUDIT ALERT: Balance exceeds collateral!\n");
+    }
+
+    // Invariant 5: Yield rate sanity (0-100% annual)
+    bool inv5_ok = (R_annual >= 0 && R_annual <= 10000);
+    invariants.pushKV("yield_rate_sane", inv5_ok);
+    if (!inv5_ok) {
+        allInvariantsOk = false;
+        alerts.push_back("WARNING: Yield rate outside expected range!");
+    }
+
+    invariants.pushKV("all_ok", allInvariantsOk);
+    result.pushKV("invariants", invariants);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 5. INFLATION MONITORING
+    // ═══════════════════════════════════════════════════════════════════════
+    UniValue inflation(UniValue::VOBJ);
+
+    // Inflation sources
+    CAmount inflationFromBlocks = blockRewards;
+    CAmount inflationFromYield = annualYieldInflation;
+
+    inflation.pushKV("block_rewards_issued", ValueFromAmount(inflationFromBlocks));
+    inflation.pushKV("estimated_annual_yield_emission", ValueFromAmount(inflationFromYield));
+    inflation.pushKV("dao_treasury_balance", ValueFromAmount(T));
+    inflation.pushKV("net_new_supply", ValueFromAmount(inflationFromBlocks));
+
+    // Inflation rate calculation (annualized)
+    double inflationRate = 0.0;
+    if (estimatedTotalSupply > 0) {
+        // Daily block inflation annualized + yield inflation
+        CAmount dailyBlockInflation = 10 * COIN * 1440;  // ~1440 blocks/day
+        CAmount annualBlockInflation = dailyBlockInflation * 365;
+        inflationRate = ((double)(annualBlockInflation + inflationFromYield) / estimatedTotalSupply) * 100.0;
+    }
+    inflation.pushKV("estimated_annual_inflation_percent", inflationRate);
+
+    // Anomaly detection
+    bool inflationAnomaly = (!inv1_ok || !inv2_ok);  // Any invariant violation is an anomaly
+    inflation.pushKV("anomaly_detected", inflationAnomaly);
+    if (inflationAnomaly) {
+        alerts.push_back("ALERT: Monetary anomaly detected - invariant violation!");
+    }
+
+    result.pushKV("inflation_monitor", inflation);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 6. GLOBAL ALARM STATUS
+    // ═══════════════════════════════════════════════════════════════════════
+    UniValue alarm(UniValue::VOBJ);
+
+    std::string status;
+    std::string statusEmoji;
+    if (!inv1_ok || !inv2_ok || !inv3_ok || !inv4_ok) {
+        status = "CRITICAL";
+        statusEmoji = "[!!!]";
+    } else if (!inv5_ok || inflationAnomaly) {
+        status = "WARNING";
+        statusEmoji = "[!]";
+    } else {
+        status = "OK";
+        statusEmoji = "[OK]";
+    }
+
+    alarm.pushKV("status", status);
+    alarm.pushKV("indicator", statusEmoji);
+    alarm.pushKV("message", status == "OK"
+        ? "All monetary invariants verified. System operating normally."
+        : "Monetary anomaly detected! Review alerts immediately.");
+    alarm.pushKV("alerts_count", (int)alerts.size());
+    alarm.pushKV("alerts", alerts);
+
+    // Add info if no KHU operations yet
+    if (!hasState && nHeight > 0) {
+        alarm.pushKV("info", "KHU system not yet initialized (no mint/redeem operations performed)");
+    }
+
+    result.pushKV("alarm", alarm);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 7. SUMMARY LINE (for quick reading)
+    // ═══════════════════════════════════════════════════════════════════════
+    std::string summary = strprintf(
+        "%s PIV2: %s | KHU(C): %s = U:%s + Z:%s | DAO: %s | Yield: %.1f%%/yr",
+        statusEmoji,
+        FormatMoney(estimatedTotalSupply),
+        FormatMoney(C),
+        FormatMoney(U),
+        FormatMoney(Z),
+        FormatMoney(T),
+        annualYieldPercent
+    );
+    result.pushKV("summary", summary);
+
+    return result;
+}
+
 // PIVX V2 Wallet RPC command table
 // Nomenclature: HU (transparent), sHU (shielded), KHU (locked), ZKHU (staked)
 static const CRPCCommand huWalletCommands[] = {
@@ -2226,7 +2486,8 @@ static const CRPCCommand huWalletCommands[] = {
     { "piv2",         "lock",                   &khulock,                   false,  {"amount"} },
     { "piv2",         "unlock",                 &khuunlock,                 false,  {"note_commitment"} },
     { "piv2",         "listlocked",             &khulistlocked,             true,   {} },
-    // Diagnostics (read-only)
+    // Audit & Diagnostics
+    { "piv2",         "getauditstate",            &khuauditstate,             true,   {} },
     { "piv2",         "piv2diagnostics",          &khudiagnostics,            true,   {"verbose"} },
 };
 

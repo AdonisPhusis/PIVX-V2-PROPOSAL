@@ -51,10 +51,14 @@ public:
     void EraseSeenMNB(const uint256& hash) { /* PIV2: No-op */ }
     void EraseSeenMNW(const uint256& hash) { /* PIV2: No-op */ }
 
+    // Set startup time (called once at node initialization)
+    void SetStartupTime(int64_t time) { m_startup_time.store(time); }
+
 private:
     std::atomic<int> m_chain_height{0};
     std::atomic<int> m_last_finalized_height{0};
     std::atomic<int64_t> m_last_finalized_time{0};
+    std::atomic<int64_t> m_startup_time{0};  // Time when node started
 };
 
 extern TierTwoSyncState g_tiertwo_sync_state;

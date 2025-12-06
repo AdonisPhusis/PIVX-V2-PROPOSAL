@@ -29,6 +29,8 @@
 #include "wallet/walletdb.h"
 #include "wallet/rpc_piv2.h"
 #include "wallet/walletutil.h"
+#include "wallet/piv2_wallet.h"  // For GetKHUBalance, GetKHULockedBalance
+#include "piv2/piv2_state.h"     // For GetCurrentKHUState
 
 #include <stdint.h>
 #include <univalue.h>
@@ -1819,9 +1821,7 @@ UniValue getbalance(const JSONRPCRequest& request)
     if (request.fHelp || (request.params.size() > 3))
         throw std::runtime_error(
             "getbalance ( minconf include_watchonly include_shield )\n"
-            "\nReturns the server's total available balance.\n"
-            "The available balance is what the wallet considers currently spendable, and is\n"
-            "thus affected by options which limit spendability such as -spendzeroconfchange.\n"
+            "\nReturns unified wallet balance showing PIV2 and KHU breakdown.\n"
 
             "\nArguments:\n"
             "1. minconf          (numeric, optional, default=0) Only include transactions confirmed at least this many times.\n"
@@ -1829,12 +1829,19 @@ UniValue getbalance(const JSONRPCRequest& request)
             "3. include_shield    (bool, optional, default=true) Also include shield balance\n"
 
             "\nResult:\n"
-            "amount              (numeric) The total amount in PIV received for this wallet.\n"
+            "{\n"
+            "  \"total\": n,           (numeric) Total wallet value (PIV2 + KHU + ZKHU)\n"
+            "  \"piv2_spendable\": n,  (numeric) PIV2 available for spending and fees\n"
+            "  \"khu_transparent\": n, (numeric) KHU transparent balance\n"
+            "  \"khu_staked\": n,      (numeric) ZKHU staked balance\n"
+            "  \"immature\": n,        (numeric) Immature coinbase\n"
+            "  \"locked\": n           (numeric) Locked as collateral\n"
+            "}\n"
 
             "\nExamples:\n"
-            "\nThe total amount in the wallet\n" +
+            "\nUnified balance view\n" +
             HelpExampleCli("getbalance", "") +
-            "\nThe total amount in the wallet, with at least 5 confirmations\n" +
+            "\nWith at least 6 confirmations\n" +
             HelpExampleCli("getbalance", "6") +
             "\nAs a json rpc call\n" +
             HelpExampleRpc("getbalance", "6"));
@@ -1853,7 +1860,28 @@ UniValue getbalance(const JSONRPCRequest& request)
     isminefilter filter = ISMINE_SPENDABLE | (fIncludeWatchOnly ?
                                               (fIncludeShielded ? ISMINE_WATCH_ONLY_ALL : ISMINE_WATCH_ONLY) : ISMINE_NO);
     filter |= fIncludeShielded ? ISMINE_SPENDABLE_SHIELDED : ISMINE_NO;
-    return ValueFromAmount(pwallet->GetAvailableBalance(filter, true, nMinDepth));
+
+    // PIV2 balances (GetAvailableBalance excludes KHU_MINT outputs)
+    CAmount nPIV2Spendable = pwallet->GetAvailableBalance(filter, true, nMinDepth);
+    CAmount nImmature = pwallet->GetImmatureBalance();
+    CAmount nLocked = pwallet->GetLockedCoins();  // MN collateral locks
+
+    // KHU balances
+    CAmount nKHUTransparent = GetKHUBalance(pwallet);
+    CAmount nKHUStaked = GetKHULockedBalance(pwallet);
+
+    // Total wallet value = PIV2 + KHU_T + ZKHU
+    CAmount nTotal = nPIV2Spendable + nKHUTransparent + nKHUStaked;
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("total", ValueFromAmount(nTotal));
+    result.pushKV("piv2_spendable", ValueFromAmount(nPIV2Spendable));
+    result.pushKV("khu_transparent", ValueFromAmount(nKHUTransparent));
+    result.pushKV("khu_staked", ValueFromAmount(nKHUStaked));
+    result.pushKV("immature", ValueFromAmount(nImmature));
+    result.pushKV("locked", ValueFromAmount(nLocked));
+
+    return result;
 }
 
 

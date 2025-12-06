@@ -1636,6 +1636,12 @@ CAmount CWalletTx::GetAvailableCredit(bool fUseCache, const isminefilter& filter
     if (GetBlocksToMaturity() > 0)
         return 0;
 
+    // KHU_MINT outputs are "colored" PIV2 - they should not be counted as regular PIV2 balance
+    // They are tracked separately via piv2balance RPC
+    if (tx->nType == CTransaction::TxType::KHU_MINT) {
+        return 0;
+    }
+
     if (fUseCache && allow_cache && m_amounts[AVAILABLE_CREDIT].m_cached[filter]) {
         return m_amounts[AVAILABLE_CREDIT].m_value[filter];
     }

@@ -44,6 +44,7 @@
 #include "spork.h"
 #include "sporkdb.h"
 #include "tiertwo/init.h"
+#include "tiertwo/tiertwo_sync_state.h"
 #include "txdb.h"
 #include "torcontrol.h"
 #include "guiinterface.h"
@@ -1190,6 +1191,10 @@ bool AppInitMain()
 #endif
     if (!g_logger->m_log_timestamps)
         LogPrintf("Startup time: %s\n", FormatISO8601DateTime(GetTime()));
+
+    // PIV2: Record startup time for cold start recovery in sync state
+    g_tiertwo_sync_state.SetStartupTime(GetTime());
+
     LogPrintf("Default data directory %s\n", GetDefaultDataDir().string());
     LogPrintf("Using data directory %s\n", GetDataDir().string());
     LogPrintf("Using config file %s\n", GetConfigFile(gArgs.GetArg("-conf", PIVX_CONF_FILENAME)).string());

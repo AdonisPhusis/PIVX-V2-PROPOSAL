@@ -4,7 +4,10 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "tiertwo/tiertwo_sync_state.h"
+#include "chain.h"
+#include "validation.h"
 #include "utiltime.h"
+#include "logging.h"
 
 TierTwoSyncState g_tiertwo_sync_state;
 
@@ -16,52 +19,78 @@ TierTwoSyncState g_tiertwo_sync_state;
 // Block 6+: DMM active, requires HU quorum
 static const int PIV2_BOOTSTRAP_HEIGHT = 5;
 
-// Cold start recovery: if the network has been down for this long,
-// allow masternodes to resume block production without recent finalized blocks
-// This breaks the "chicken and egg" deadlock when restarting a stale network
-static const int64_t PIV2_COLD_START_TIMEOUT = 300; // 5 minutes
+// Cold start timeout: if the tip is older than this, consider the network stale
+// and allow masternodes to restart block production without recent finality.
+// Testnet: 5 * 120s = 600s (10 minutes) - ~10 missed blocks
+// For mainnet: consider 30 * 120s = 3600s (1 hour)
+static const int64_t PIV2_STALE_CHAIN_TIMEOUT = 5 * PIV2_SYNC_TIMEOUT;
 
 /**
  * PIV2: Simplified sync check based on HU finality
  *
- * During bootstrap (height <= 5): Always synced
- * After bootstrap: Synced if we received a finalized block (with HU quorum) in the last 120 seconds.
- * Cold start recovery: If startup time > 5 minutes AND no finalized blocks received,
- *                      allow sync to prevent network deadlock after downtime.
+ * Logic:
+ * 1. Never synced during IBD (initial block download)
+ * 2. Bootstrap phase (height <= 5): Always synced
+ * 3. Normal operation: Synced if we received a finalized block recently (< 120s)
+ * 4. Cold start recovery: If tip is very old (stale chain), allow DMM to restart
+ *
+ * The cold start case handles network-wide restarts where:
+ * - All nodes have the same stale tip
+ * - No recent finalized blocks exist
+ * - IBD is complete (no headers ahead)
+ * - We need to allow DMM to produce the next block to restart finality
  */
 bool TierTwoSyncState::IsBlockchainSynced() const
 {
-    int chainHeight = m_chain_height.load();
-
-    // Bootstrap phase: blocks 0-5 are always considered synced
-    // This allows DMM to start producing block 6 without waiting for HU signatures
-    if (chainHeight <= PIV2_BOOTSTRAP_HEIGHT) {
-        return true;
+    // 1. Never say "synced" during IBD - we might be behind
+    if (IsInitialBlockDownload()) {
+        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (IBD in progress)\n");
+        return false;
     }
 
-    // After bootstrap: check if we received a finalized block recently
-    int64_t lastFinalized = m_last_finalized_time.load();
+    // Get current chain tip
+    const CBlockIndex* tip = nullptr;
+    {
+        LOCK(cs_main);
+        tip = chainActive.Tip();
+    }
+
+    if (!tip) {
+        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (no tip)\n");
+        return false;
+    }
+
+    int height = tip->nHeight;
+    int64_t tipTime = tip->GetBlockTime();
     int64_t now = GetTime();
 
-    // Normal case: we received a finalized block recently
-    if ((now - lastFinalized) <= PIV2_SYNC_TIMEOUT) {
+    // 2. Bootstrap phase: blocks 0-5 are always considered synced
+    // This allows DMM to start producing block 6 without waiting for HU signatures
+    if (height <= PIV2_BOOTSTRAP_HEIGHT) {
+        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: true (bootstrap phase, height=%d)\n", height);
         return true;
     }
 
-    // Cold start recovery: allow sync if node has been running long enough
-    // This handles the case where:
-    // 1. Network was down (no finalized blocks for a while)
-    // 2. All nodes restart with bootstrap data
-    // 3. No node can produce blocks because IsBlockchainSynced() returns false
-    // 4. IsBlockchainSynced() returns false because no new finalized blocks
-    // Solution: After startup grace period, assume sync is OK to break the deadlock
-    int64_t startupTime = m_startup_time.load();
-    if (startupTime > 0 && (now - startupTime) >= PIV2_COLD_START_TIMEOUT) {
-        // Node has been running for 5+ minutes without receiving finalized blocks
-        // This is a cold start situation - allow sync to resume block production
+    // 3. Normal case: we received a finalized block recently
+    int64_t lastFinalized = m_last_finalized_time.load();
+    if (lastFinalized > 0 && (now - lastFinalized) <= PIV2_SYNC_TIMEOUT) {
+        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: true (recent finality, age=%ds)\n",
+                 (int)(now - lastFinalized));
         return true;
     }
 
+    // 4. Cold start recovery: tip is very old (network was stopped)
+    // If IBD is done and tip is stale, we're on a dead network that needs restart
+    int64_t tipAge = now - tipTime;
+    if (tipAge > PIV2_STALE_CHAIN_TIMEOUT) {
+        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: true (cold start recovery, tip age=%ds)\n",
+                 (int)tipAge);
+        return true;
+    }
+
+    // 5. Not synced - waiting for finality or still catching up
+    LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (waiting for finality, lastFinalized=%ds ago, tipAge=%ds)\n",
+             lastFinalized > 0 ? (int)(now - lastFinalized) : -1, (int)tipAge);
     return false;
 }
 
@@ -69,4 +98,5 @@ void TierTwoSyncState::OnFinalizedBlock(int height, int64_t timestamp)
 {
     m_last_finalized_height.store(height);
     m_last_finalized_time.store(timestamp);
+    LogPrint(BCLog::MASTERNODE, "OnFinalizedBlock: height=%d, timestamp=%d\n", height, (int)timestamp);
 }

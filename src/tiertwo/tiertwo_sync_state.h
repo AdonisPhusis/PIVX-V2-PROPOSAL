@@ -18,15 +18,14 @@ class uint256;  // Forward declaration for legacy functions
 #define MASTERNODE_SYNC_FINISHED 999
 
 // PIV2: Sync is based on receiving finalized blocks (HU quorum)
-// No bootstrap phase - quorum required from block 1
-// Sync timeout: consider synced if we received a finalized block in last 60 seconds
-// PIV2: Sync timeout must be longer than DMM block interval (60s) to avoid race conditions
+// Sync timeout: consider synced if we received a finalized block in last 120 seconds
 // Using 120s gives at least two block production opportunities per finality event
 #define PIV2_SYNC_TIMEOUT 120
 
 class TierTwoSyncState {
 public:
     // PIV2: Synced if we received a finalized block recently (quorum achieved)
+    // or if the chain is stale (cold start recovery)
     bool IsBlockchainSynced() const;
     bool IsSynced() const { return IsBlockchainSynced(); }
     bool IsSporkListSynced() const { return true; }  // PIV2: Always true
@@ -35,7 +34,7 @@ public:
     // PIV2: Called when a finalized block is received (has HU quorum)
     void OnFinalizedBlock(int height, int64_t timestamp);
 
-    // PIV2: Set current chain height (called from validation)
+    // PIV2: Set current chain height (called from validation) - kept for legacy compat
     void SetChainHeight(int height) { m_chain_height.store(height); }
     int GetChainHeight() const { return m_chain_height.load(); }
 
@@ -51,14 +50,13 @@ public:
     void EraseSeenMNB(const uint256& hash) { /* PIV2: No-op */ }
     void EraseSeenMNW(const uint256& hash) { /* PIV2: No-op */ }
 
-    // Set startup time (called once at node initialization)
-    void SetStartupTime(int64_t time) { m_startup_time.store(time); }
+    // Legacy startup time setter (no-op, kept for compatibility)
+    void SetStartupTime(int64_t time) { /* PIV2: No-op - using tip age instead */ }
 
 private:
     std::atomic<int> m_chain_height{0};
     std::atomic<int> m_last_finalized_height{0};
     std::atomic<int64_t> m_last_finalized_time{0};
-    std::atomic<int64_t> m_startup_time{0};  // Time when node started
 };
 
 extern TierTwoSyncState g_tiertwo_sync_state;

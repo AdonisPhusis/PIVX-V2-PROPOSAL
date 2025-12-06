@@ -15,6 +15,7 @@
 #include "piv2/piv2_quorum.h"
 #include "protocol.h"
 #include "util/system.h"
+#include "utiltime.h"
 #include "validation.h"
 
 namespace hu {
@@ -372,6 +373,12 @@ void NotifyBlockConnected(const CBlockIndex* pindex, CConnman* connman)
 // Bootstrap height constant - same as in tiertwo_sync_state.cpp
 static const int PIV2_BOOTSTRAP_HEIGHT = 5;
 
+// Cold start timeout: if the tip is older than this, bypass quorum check
+// This allows the network to restart after all nodes were stopped
+// Testnet: 5 * 120s = 600s (10 minutes) - ~5 missed blocks
+// For mainnet: consider 30 * 120s = 3600s (1 hour)
+static const int64_t PIV2_STALE_TIP_TIMEOUT = 600;
+
 bool PreviousBlockHasQuorum(const CBlockIndex* pindexPrev)
 {
     if (!pindexPrev) {
@@ -391,6 +398,20 @@ bool PreviousBlockHasQuorum(const CBlockIndex* pindexPrev)
     // ═══════════════════════════════════════════════════════════════════════════
     if (pindexPrev->nHeight <= PIV2_BOOTSTRAP_HEIGHT) {
         return true;  // Bootstrap blocks exempt - no HU signatures yet
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Cold Start Recovery: If tip is very old, bypass quorum check
+    // ═══════════════════════════════════════════════════════════════════════════
+    // This handles network-wide restarts where:
+    // - All nodes have the same stale tip
+    // - No recent HU signatures exist (weren't exchanged during reindex)
+    // - We need to allow DMM to produce the next block to restart finality
+    // ═══════════════════════════════════════════════════════════════════════════
+    int64_t tipAge = GetTime() - pindexPrev->GetBlockTime();
+    if (tipAge > PIV2_STALE_TIP_TIMEOUT) {
+        LogPrintf("HU Signaling: Cold start recovery - bypassing quorum check (tip age=%ds)\n", (int)tipAge);
+        return true;
     }
 
     // Check if previous block has quorum

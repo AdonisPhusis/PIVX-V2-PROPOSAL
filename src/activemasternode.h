@@ -50,7 +50,8 @@ private:
     std::atomic<int> nLastProducedHeight{0};
     std::atomic<bool> fDMMSchedulerRunning{false};
     std::thread dmmSchedulerThread;
-    static constexpr int DMM_BLOCK_INTERVAL_SECONDS = 60;
+    static constexpr int DMM_BLOCK_INTERVAL_SECONDS = 60;    // Minimum time between blocks we produce
+    static constexpr int DMM_CHECK_INTERVAL_SECONDS = 5;     // How often to check if we should produce
     static constexpr int DMM_MISSED_BLOCK_TIMEOUT = 90;
 
 public:

@@ -32,6 +32,7 @@ CActiveDeterministicMasternodeManager* activeMasternodeManager{nullptr};
 
 // Definition of static constexpr members (required for ODR-use in C++14)
 constexpr int CActiveDeterministicMasternodeManager::DMM_BLOCK_INTERVAL_SECONDS;
+constexpr int CActiveDeterministicMasternodeManager::DMM_CHECK_INTERVAL_SECONDS;
 constexpr int CActiveDeterministicMasternodeManager::DMM_MISSED_BLOCK_TIMEOUT;
 
 static bool GetLocalAddress(CService& addrRet)
@@ -476,13 +477,15 @@ void CActiveDeterministicMasternodeManager::StartDMMScheduler()
     }
 
     fDMMSchedulerRunning.store(true);
-    LogPrintf("DMM-SCHEDULER: Starting periodic block producer thread (interval=%ds)\n",
-              DMM_BLOCK_INTERVAL_SECONDS);
+    LogPrintf("DMM-SCHEDULER: Starting periodic block producer thread (check interval=%ds, block interval=%ds)\n",
+              DMM_CHECK_INTERVAL_SECONDS, DMM_BLOCK_INTERVAL_SECONDS);
 
     dmmSchedulerThread = std::thread([this]() {
         while (fDMMSchedulerRunning.load() && !ShutdownRequested()) {
-            // Sleep first to avoid immediate block production
-            for (int i = 0; i < DMM_BLOCK_INTERVAL_SECONDS * 10 && fDMMSchedulerRunning.load() && !ShutdownRequested(); ++i) {
+            // Check frequently (every DMM_CHECK_INTERVAL_SECONDS) to not miss our production window
+            // The fallback rotates every nHuFallbackRecoverySeconds (10s on testnet),
+            // so we need to check more often than that to catch our slot
+            for (int i = 0; i < DMM_CHECK_INTERVAL_SECONDS * 10 && fDMMSchedulerRunning.load() && !ShutdownRequested(); ++i) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
 

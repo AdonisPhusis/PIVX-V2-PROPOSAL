@@ -2258,6 +2258,15 @@ static bool ActivateBestChainStep(CValidationState& state, CBlockIndex* pindexMo
     const CBlockIndex* pindexOldTip = chainActive.Tip();
     const CBlockIndex* pindexFork = chainActive.FindFork(pindexMostWork);
 
+    // PIV2 HU FINALITY: Check if this reorg would violate finality (BFT guarantee)
+    // Per BLUEPRINT: NEVER reorg below lastFinalizedHeight
+    if (pindexFork && chainActive.Tip() && pindexFork != chainActive.Tip()) {
+        if (hu::WouldViolateHuFinality(pindexMostWork, pindexFork)) {
+            return state.DoS(100, error("%s: HU Finality violation - cannot reorg past finalized block",
+                                        __func__), REJECT_INVALID, "bad-hu-finality-reorg");
+        }
+    }
+
     // Disconnect active blocks which are no longer in the best chain.
     bool fBlocksDisconnected = false;
     DisconnectedBlockTransactions disconnectpool;

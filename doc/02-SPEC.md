@@ -294,42 +294,159 @@ ss << nHeight << hashBlock << hashPrevState;
 
 ---
 
-## 12. PIV2 Finality System
+## 12. PIV2 Consensus: DMM & HU (BLUEPRINT)
 
-### Quorum Selection
+PIV2 uses two **independent** consensus layers inspired by ETH2/Tendermint architecture:
+
 ```
-seed = SHA256(prevCycleBlockHash || cycleIndex || "HU_QUORUM")
-score(MN) = SHA256(seed || proTxHash)
-
-Quorum = Top nHuQuorumSize MNs by score (descending)
-```
-
-### Block Finality
-```
-A block is FINAL when:
-  - nHuQuorumThreshold signatures collected from quorum members
-  - Each signature is ECDSA (secp256k1) from operator key
-
-Finality prevents:
-  - Reorgs past finalized blocks
-  - Double-spends on confirmed transactions
+┌─────────────────────────────────────────────────────────┐
+│                    PIV2 CONSENSUS                        │
+├──────────────────────┬──────────────────────────────────┤
+│   DMM Layer          │   HU Layer                       │
+│   (Liveness)         │   (Security/Finality)            │
+├──────────────────────┼──────────────────────────────────┤
+│ - Produces blocks    │ - Signs finalized blocks         │
+│ - NEVER waits for HU │ - 2/3 quorum for finality        │
+│ - Deterministic      │ - Rotating quorum                │
+│   producer selection │ - Anti-reorg protection          │
+└──────────────────────┴──────────────────────────────────┘
 ```
 
-### DMM Leader Selection
-```
-score(MN) = SHA256(prevBlockHash || nHeight || proTxHash)
+### 12.1 Two Independent Layers
 
-Leader = MN with highest score (confirmed MNs only)
+#### DMM Layer (Deterministic Masternode Mining)
+- **Purpose**: Guarantees LIVENESS - the chain always progresses
+- **Rule**: NEVER depends on HU status
+- **Selection**: Deterministic based on `Hash(prevBlockHash + height + proTxHash)`
+- **Fallback**: Timeout-based rotation to next MN if primary is offline
+
+#### HU Layer (HORUS ULTRA Finality)
+- **Purpose**: Guarantees SECURITY - BFT finality for confirmed blocks
+- **Rule**: Provides finality AFTER block production
+- **Selection**: Rotating quorum based on `Hash(lastFinalizedBlockHash + cycleIndex)`
+- **Threshold**: 2/3 of quorum members must sign for finality
+
+### 12.2 DMM Block Production
+
+#### Producer Selection
+```cpp
+// Primary producer: highest score
+score = Hash(prevBlockHash + height + proTxHash)
+producer = MN with highest score
+
+// Fallback (after timeout)
+if (timeSincePrevBlock > leaderTimeout):
+    fallbackIndex = 1 + (excessTime / fallbackInterval)
+    fallbackIndex = fallbackIndex % numMNs  // Rotate through all
+    producer = scoredMNs[fallbackIndex]
 ```
 
-### Timeout & Fallback
-```
-If leader times out (nHuLeaderTimeoutSeconds):
-  - Round-robin to next MN in quorum
-  - Blocks remain pending until finalized
+#### CRITICAL RULE: No HU Dependency
+```cpp
+// DMM-SCHEDULER pseudocode
+void TryProducingBlock():
+    if (!IsBlockchainSynced())
+        return
+    if (!IsLocalBlockProducer())
+        return
+
+    // DO NOT check PreviousBlockHasQuorum() - this would block liveness
+    // HU finality is checked AFTER block is produced, not before
+
+    CreateAndBroadcastBlock()
 ```
 
-### LevelDB Schema (Finality)
+### 12.3 HU Quorum Selection
+
+#### Cycle Configuration
+- **Rotation**: Every `nHuQuorumRotationBlocks` DMM heights (default: 12)
+- **Quorum Size**: `nHuQuorumSize` members (testnet: 3, mainnet: 12)
+- **Threshold**: `nHuQuorumThreshold` signatures required (2/3)
+
+#### Quorum Seed Calculation (CRITICAL - BLUEPRINT REQUIREMENT)
+```
+seed = SHA256(lastFinalizedBlockHash || cycleIndex || "HU_QUORUM")
+```
+
+**Security Rationale**:
+- Using `lastFinalizedBlockHash` prevents adversaries from influencing quorum selection
+- A finalized block cannot be reverted (BFT guarantee)
+- This ensures the quorum is deterministic and manipulation-resistant
+
+**Bootstrap Exception** (Cycle 0, blocks 0-11):
+- Use genesis block hash or null
+- This allows the first quorum to form before any finality exists
+
+#### Member Selection Algorithm
+```cpp
+for each validMN in mnList:
+    if mn.confirmedHash.IsNull():
+        continue  // Skip unconfirmed MNs
+    score = Hash(seed + mn.proTxHash)
+    scoredMNs.push(score, mn)
+
+sort(scoredMNs, descending)
+quorum = scoredMNs[0..quorumSize]
+```
+
+### 12.4 HU Signature Flow
+```
+Block N produced by DMM
+         │
+         ▼
+┌─────────────────────────────────────────┐
+│      Block propagates to network         │
+└─────────────────┬───────────────────────┘
+                  │
+    ┌─────────────┼─────────────┐
+    ▼             ▼             ▼
+┌───────┐    ┌───────┐    ┌───────┐
+│ MN_A  │    │ MN_B  │    │ MN_C  │
+│(quorum│    │(quorum│    │(quorum│
+│member)│    │member)│    │member)│
+└───┬───┘    └───┬───┘    └───┬───┘
+    │            │            │
+    ▼            ▼            ▼
+ Sign(N)      Sign(N)      Sign(N)
+    │            │            │
+    └────────────┼────────────┘
+                 │
+                 ▼
+    ┌─────────────────────────────┐
+    │ Collect 2/3 signatures      │
+    │ Block N is FINALIZED        │
+    └─────────────────────────────┘
+```
+
+### 12.5 Anti-Reorg Protection
+
+**Rule**: NEVER reorg below lastFinalizedHeight
+
+```cpp
+bool AcceptBlock(block, reorgDepth):
+    if (chainActive.Height() - reorgDepth < lastFinalizedHeight):
+        return error("Cannot reorg below finalized height")
+    return true
+```
+
+### 12.6 Cold Start Recovery
+
+When the network restarts after being stopped:
+
+1. **Stale Tip Detection**: If tip age > 600 seconds (10 minutes)
+2. **Bypass Finality Check**: Allow DMM to produce blocks without recent finality
+3. **Resume Normal Operation**: Once new blocks are produced and signed
+
+### 12.7 Bootstrap Phase (Blocks 0-5)
+```
+Block 0: Genesis (no MNs exist)
+Block 1: Premine (creates collateral UTXOs)
+Block 2: Collateral confirmation
+Blocks 3-5: ProRegTx (MNs register)
+Block 6+: DMM active, HU quorum operational
+```
+
+### 12.8 LevelDB Schema (Finality)
 ```
 'F' + blockHash → CHuFinality {
     blockHash
@@ -337,6 +454,58 @@ If leader times out (nHuLeaderTimeoutSeconds):
     mapSignatures: proTxHash → ECDSA signature
 }
 ```
+
+### 12.9 Code Locations
+
+| Component | File | Function |
+|-----------|------|----------|
+| DMM Scheduler | `src/activemasternode.cpp` | `TryProducingBlock()` |
+| Block Producer | `src/evo/blockproducer.cpp` | `GetBlockProducerWithFallback()` |
+| HU Signaling | `src/piv2/piv2_signaling.cpp` | `OnNewBlock()`, `ProcessHuSignature()` |
+| HU Quorum | `src/piv2/piv2_quorum.cpp` | `GetHuQuorum()`, `ComputeHuQuorumSeed()` |
+| HU Finality | `src/piv2/piv2_finality.cpp` | `AddSignature()`, `HasFinality()` |
+| Sync State | `src/tiertwo/tiertwo_sync_state.cpp` | `IsBlockchainSynced()` |
+
+### 12.10 Known Issues / TODO
+
+#### ISSUE 1: Quorum Seed Uses prevCycleBlockHash Instead of lastFinalizedBlockHash
+
+**Blueprint Requirement**:
+```cpp
+seed = Hash(lastFinalizedBlockHash + cycleIndex + "HU_QUORUM")
+```
+
+**Fix Applied** (`piv2_quorum.cpp:GetHuQuorumForHeight()`):
+- Now searches for last finalized block via `huFinalityHandler->GetFinality()`
+- Uses `HasFinality(nHuQuorumThreshold)` to verify block reached 2/3 signatures
+- Falls back to previous cycle block hash during early chain bootstrap
+- Bootstrap cycle 0 (blocks 0-11) uses null hash
+
+**Security Impact**: Medium - Adversary could potentially manipulate block hash at cycle boundary
+**Status**: ✅ FIXED (commit pending)
+
+#### ISSUE 2: Missing Anti-Reorg Protection Below Finalized Height
+
+**Blueprint Requirement**: `if (reorgDepth > chainActive.Height() - lastFinalizedHeight): return error(...)`
+
+**Fix Applied** (`validation.cpp:ActivateBestChainStep()`):
+- Added `WouldViolateHuFinality()` check before allowing reorgs
+- Walks from fork point to current tip, checking for finalized blocks
+- Returns DoS(100) error if any finalized block would be reverted
+- Uses `pHuFinalityDB->IsBlockFinal()` to check finality status
+
+```cpp
+// PIV2 HU FINALITY: Check if this reorg would violate finality (BFT guarantee)
+if (pindexFork && chainActive.Tip() && pindexFork != chainActive.Tip()) {
+    if (hu::WouldViolateHuFinality(pindexMostWork, pindexFork)) {
+        return state.DoS(100, error("%s: HU Finality violation...", __func__),
+                         REJECT_INVALID, "bad-hu-finality-reorg");
+    }
+}
+```
+
+**Security Impact**: High - This is the BFT guarantee that prevents deep reorgs
+**Status**: ✅ FIXED (commit pending)
 
 ---
 

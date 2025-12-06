@@ -115,32 +115,82 @@ std::vector<CDeterministicMNCPtr> GetHuQuorumForHeight(
     }
 
     int cycleIndex = GetHuCycleIndex(nHeight);
-    int prevCycleStartHeight = GetHuCycleStartHeight(cycleIndex) - 1;
 
-    // Get the block hash at end of previous cycle
-    uint256 prevCycleBlockHash;
+    // BLUEPRINT REQUIREMENT:
+    // Use lastFinalizedBlockHash for quorum seed to prevent manipulation
+    // A finalized block cannot be reverted (BFT guarantee)
+    uint256 seedBlockHash;
 
-    if (prevCycleStartHeight < 0) {
-        // First cycle - use genesis block hash or null
-        prevCycleBlockHash = uint256();
+    if (cycleIndex == 0) {
+        // Bootstrap: First cycle (blocks 0-11) - use null/genesis
+        seedBlockHash = uint256();
+        LogPrint(BCLog::HU, "HU Quorum: Bootstrap cycle 0, using null seed\n");
     } else {
-        // Walk back to find the block at prevCycleStartHeight
-        const CBlockIndex* pindexCycleEnd = pindexPrev;
-        while (pindexCycleEnd && pindexCycleEnd->nHeight > prevCycleStartHeight) {
-            pindexCycleEnd = pindexCycleEnd->pprev;
-        }
+        // Find the last finalized block hash
+        // Walk back through finality data to find the most recent finalized block
+        if (huFinalityHandler) {
+            const Consensus::Params& consensus = Params().GetConsensus();
+            bool foundFinalized = false;
 
-        if (pindexCycleEnd && pindexCycleEnd->nHeight == prevCycleStartHeight) {
-            prevCycleBlockHash = pindexCycleEnd->GetBlockHash();
+            // Search for finalized block, starting from previous cycle
+            int searchStart = GetHuCycleStartHeight(cycleIndex) - 1;
+            const CBlockIndex* pindex = pindexPrev;
+
+            // Walk back to search start
+            while (pindex && pindex->nHeight > searchStart) {
+                pindex = pindex->pprev;
+            }
+
+            // Now search backwards for a finalized block
+            while (pindex && pindex->nHeight >= 0) {
+                CHuFinality finality;
+                if (huFinalityHandler->GetFinality(pindex->GetBlockHash(), finality)) {
+                    if (finality.HasFinality(consensus.nHuQuorumThreshold)) {
+                        seedBlockHash = pindex->GetBlockHash();
+                        foundFinalized = true;
+                        LogPrint(BCLog::HU, "HU Quorum: Using lastFinalizedBlockHash %s at height %d for cycle %d\n",
+                                 seedBlockHash.ToString().substr(0, 16), pindex->nHeight, cycleIndex);
+                        break;
+                    }
+                }
+                pindex = pindex->pprev;
+            }
+
+            if (!foundFinalized) {
+                // No finalized block found yet (early in chain)
+                // Fallback to previous cycle end block (less secure but necessary for bootstrap)
+                int prevCycleStartHeight = GetHuCycleStartHeight(cycleIndex) - 1;
+                pindex = pindexPrev;
+                while (pindex && pindex->nHeight > prevCycleStartHeight) {
+                    pindex = pindex->pprev;
+                }
+                if (pindex && pindex->nHeight == prevCycleStartHeight) {
+                    seedBlockHash = pindex->GetBlockHash();
+                } else {
+                    seedBlockHash = pindexPrev->GetBlockHash();
+                }
+                LogPrint(BCLog::HU, "HU Quorum: No finalized block found, using fallback hash for cycle %d\n",
+                         cycleIndex);
+            }
         } else {
-            // Shouldn't happen in normal operation
-            LogPrint(BCLog::HU, "HU Quorum: Could not find block at height %d for cycle %d\n",
-                     prevCycleStartHeight, cycleIndex);
-            prevCycleBlockHash = pindexPrev->GetBlockHash();
+            // Finality handler not initialized (early startup)
+            // Use previous cycle block hash as fallback
+            int prevCycleStartHeight = GetHuCycleStartHeight(cycleIndex) - 1;
+            const CBlockIndex* pindex = pindexPrev;
+            while (pindex && pindex->nHeight > prevCycleStartHeight) {
+                pindex = pindex->pprev;
+            }
+            if (pindex && pindex->nHeight == prevCycleStartHeight) {
+                seedBlockHash = pindex->GetBlockHash();
+            } else {
+                seedBlockHash = pindexPrev->GetBlockHash();
+            }
+            LogPrint(BCLog::HU, "HU Quorum: Finality handler not ready, using prev cycle hash for cycle %d\n",
+                     cycleIndex);
         }
     }
 
-    return GetHuQuorum(mnList, cycleIndex, prevCycleBlockHash);
+    return GetHuQuorum(mnList, cycleIndex, seedBlockHash);
 }
 
 } // namespace hu

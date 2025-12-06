@@ -19,8 +19,16 @@ namespace hu {
  * HU Quorum System - Deterministic MN selection for block finality
  *
  * Each cycle of HU_CYCLE_LENGTH blocks (12) has a fixed quorum of HU_QUORUM_SIZE (12) MNs.
+ *
+ * BLUEPRINT REQUIREMENT (CRITICAL - BFT Security):
  * Selection is deterministic based on:
- *   seed = Hash(lastBlockHashOfPrevCycle || cycleIndex || "HU_QUORUM")
+ *   seed = Hash(lastFinalizedBlockHash || cycleIndex || "HU_QUORUM")
+ *
+ * Using lastFinalizedBlockHash (not prevCycleBlockHash) prevents adversaries from
+ * manipulating quorum selection, since finalized blocks cannot be reverted (BFT guarantee).
+ *
+ * Bootstrap Exception: Cycle 0 (blocks 0-11) uses null/genesis hash since no
+ * finalized blocks exist yet.
  *
  * The quorum members sign blocks in their cycle. When HU_FINALITY_THRESHOLD (8)
  * signatures are collected, the block is considered final.
@@ -50,11 +58,14 @@ inline int GetHuCycleStartHeight(int cycleIndex, int nCycleLength = HU_CYCLE_LEN
 
 /**
  * Compute the seed for quorum selection
- * @param prevCycleBlockHash Hash of last block in previous cycle
+ * @param seedBlockHash Hash to use for seed (should be lastFinalizedBlockHash per blueprint)
  * @param cycleIndex Current cycle index
  * @return Deterministic seed for MN selection
+ *
+ * Note: Per BLUEPRINT requirement, the caller should pass lastFinalizedBlockHash
+ * for BFT security. See GetHuQuorumForHeight() for the proper implementation.
  */
-uint256 ComputeHuQuorumSeed(const uint256& prevCycleBlockHash, int cycleIndex);
+uint256 ComputeHuQuorumSeed(const uint256& seedBlockHash, int cycleIndex);
 
 /**
  * Select the HU quorum for a given cycle

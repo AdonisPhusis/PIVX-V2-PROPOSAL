@@ -305,9 +305,13 @@ bool CActiveDeterministicMasternodeManager::IsLocalBlockProducer(const CBlockInd
     // Get the MN list at this height
     CDeterministicMNList mnList = deterministicMNManager->GetListForBlock(pindexPrev);
 
-    // Get expected producer for next block
+    // Use GetBlockProducerWithFallback to support timeout-based fallback
+    // This allows other MNs to produce if the primary producer is offline
     CDeterministicMNCPtr expectedMn;
-    if (!mn_consensus::GetBlockProducer(pindexPrev, mnList, expectedMn)) {
+    int producerIndex = 0;
+    int64_t nNow = GetTime();
+
+    if (!mn_consensus::GetBlockProducerWithFallback(pindexPrev, mnList, nNow, expectedMn, producerIndex)) {
         // No confirmed MNs yet - we can't produce
         return false;
     }
@@ -316,8 +320,13 @@ bool CActiveDeterministicMasternodeManager::IsLocalBlockProducer(const CBlockInd
     bool isUs = (expectedMn->proTxHash == info.proTxHash);
 
     if (isUs) {
-        LogPrint(BCLog::MASTERNODE, "DMM-SCHEDULER: Local MN %s is producer for block %d\n",
-                 info.proTxHash.ToString().substr(0, 16), pindexPrev->nHeight + 1);
+        if (producerIndex > 0) {
+            LogPrintf("DMM-SCHEDULER: Local MN %s is FALLBACK producer #%d for block %d\n",
+                     info.proTxHash.ToString().substr(0, 16), producerIndex, pindexPrev->nHeight + 1);
+        } else {
+            LogPrint(BCLog::MASTERNODE, "DMM-SCHEDULER: Local MN %s is producer for block %d\n",
+                     info.proTxHash.ToString().substr(0, 16), pindexPrev->nHeight + 1);
+        }
     }
 
     return isUs;

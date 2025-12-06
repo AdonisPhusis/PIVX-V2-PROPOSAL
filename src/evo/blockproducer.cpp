@@ -122,17 +122,20 @@ bool GetBlockProducerWithFallback(const CBlockIndex* pindexPrev,
     // Fallback 1: nHuLeaderTimeoutSeconds to nHuLeaderTimeoutSeconds + nHuFallbackRecoverySeconds
     // Fallback 2: nHuLeaderTimeoutSeconds + nHuFallbackRecoverySeconds to ...
     // etc.
+    //
+    // When the fallback index exceeds the number of MNs, we wrap around using modulo.
+    // This ensures that even if some MNs are offline, the rotation will eventually
+    // give every online MN a chance to produce a block.
 
     int producerIndex = 0;
     if (nTimeSincePrevBlock > consensusParams.nHuLeaderTimeoutSeconds) {
         // Past primary window, calculate fallback index
         int64_t fallbackTime = nTimeSincePrevBlock - consensusParams.nHuLeaderTimeoutSeconds;
-        producerIndex = 1 + (fallbackTime / consensusParams.nHuFallbackRecoverySeconds);
+        int rawIndex = 1 + (fallbackTime / consensusParams.nHuFallbackRecoverySeconds);
 
-        // Cap to available MNs
-        if (producerIndex >= (int)scores.size()) {
-            producerIndex = scores.size() - 1;
-        }
+        // Wrap around using modulo to rotate through all available MNs
+        // This ensures offline MNs don't block progress forever
+        producerIndex = rawIndex % (int)scores.size();
     }
 
     outMn = scores[producerIndex].second;

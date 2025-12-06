@@ -8,6 +8,7 @@
 #include "validation.h"
 #include "utiltime.h"
 #include "logging.h"
+#include "net.h"
 
 TierTwoSyncState g_tiertwo_sync_state;
 
@@ -25,14 +26,42 @@ static const int PIV2_BOOTSTRAP_HEIGHT = 5;
 // For mainnet: consider 30 * 120s = 3600s (1 hour)
 static const int64_t PIV2_STALE_CHAIN_TIMEOUT = 5 * PIV2_SYNC_TIMEOUT;
 
+// Maximum blocks behind best peer before we consider ourselves "behind"
+// If a peer announces a height > localHeight + this tolerance, we're not synced
+static const int PIV2_PEER_HEIGHT_TOLERANCE = 2;
+
+/**
+ * Get the maximum height announced by any connected peer
+ * Returns -1 if no peers connected or g_connman not available
+ */
+static int GetBestPeerHeight()
+{
+    if (!g_connman) {
+        return -1;
+    }
+
+    int bestHeight = -1;
+    g_connman->ForEachNode([&bestHeight](CNode* pnode) {
+        // nStartingHeight is set when the peer connects and sends version message
+        // It represents the best height the peer had when connecting
+        int peerHeight = pnode->nStartingHeight;
+        if (peerHeight > bestHeight) {
+            bestHeight = peerHeight;
+        }
+    });
+
+    return bestHeight;
+}
+
 /**
  * PIV2: Simplified sync check based on HU finality
  *
- * Logic:
+ * Logic (ordered by priority):
  * 1. Bootstrap phase (height <= 5): Always synced
- * 2. Cold start recovery: If tip is very old (stale chain), bypass IBD and allow restart
+ * 2. Cold start recovery: If tip is very old (stale chain), bypass all checks
  * 3. Recent finality: Synced if we received a finalized block recently (< 120s)
- * 4. Never synced during IBD (initial block download) - we might be behind
+ * 4. Peer height check: NOT synced if any peer announces height > local + 2
+ * 5. Never synced during IBD (initial block download) - we might be behind
  *
  * The cold start case handles network-wide restarts where:
  * - All nodes have the same stale tip
@@ -40,12 +69,16 @@ static const int64_t PIV2_STALE_CHAIN_TIMEOUT = 5 * PIV2_SYNC_TIMEOUT;
  * - The chain has been dead for a while (tip very old)
  * - We need to allow DMM to produce the next block to restart finality
  *
- * IMPORTANT: Cold start and finality checks MUST come BEFORE IBD check because:
+ * IMPORTANT: Cold start and finality checks MUST come BEFORE peer/IBD checks because:
  * - IsInitialBlockDownload() returns true if tip is too old (nMaxTipAge)
  * - On a stale testnet, IBD will stay true forever (chicken-and-egg)
  * - Cold start allows DMM to produce a new block
  * - After cold start, HU finality gives us confidence we're synced
  * - IBD is legacy Bitcoin logic that doesn't understand HU
+ *
+ * CRITICAL: The peer height check prevents a node from producing blocks while
+ * behind peers. This avoids creating fork branches. A node must download
+ * blocks from peers before participating in consensus.
  */
 bool TierTwoSyncState::IsBlockchainSynced() const
 {
@@ -95,14 +128,24 @@ bool TierTwoSyncState::IsBlockchainSynced() const
         return true;
     }
 
-    // 4. Never say "synced" during IBD - we might be behind
-    // Note: This is checked AFTER cold start AND finality checks
+    // 4. CRITICAL: If any peer announces a height significantly ahead, we're NOT synced
+    // This prevents producing blocks while behind (would cause forks)
+    // Must download blocks from peers before participating in consensus
+    int bestPeerHeight = GetBestPeerHeight();
+    if (bestPeerHeight > 0 && bestPeerHeight > height + PIV2_PEER_HEIGHT_TOLERANCE) {
+        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (behind peers, local=%d, best peer=%d)\n",
+                 height, bestPeerHeight);
+        return false;
+    }
+
+    // 5. Never say "synced" during IBD - we might be behind
+    // Note: This is checked AFTER cold start, finality, AND peer height checks
     if (IsInitialBlockDownload()) {
         LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (IBD in progress)\n");
         return false;
     }
 
-    // 5. Not synced - waiting for finality or still catching up
+    // 6. Not synced - waiting for finality or still catching up
     LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (waiting for finality, lastFinalized=%ds ago, tipAge=%ds)\n",
              lastFinalized > 0 ? (int)(now - lastFinalized) : -1, (int)tipAge);
     return false;

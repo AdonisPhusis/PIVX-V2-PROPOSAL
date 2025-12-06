@@ -31,8 +31,8 @@ static const int64_t PIV2_STALE_CHAIN_TIMEOUT = 5 * PIV2_SYNC_TIMEOUT;
  * Logic:
  * 1. Bootstrap phase (height <= 5): Always synced
  * 2. Cold start recovery: If tip is very old (stale chain), bypass IBD and allow restart
- * 3. Never synced during IBD (initial block download) - we might be behind
- * 4. Normal operation: Synced if we received a finalized block recently (< 120s)
+ * 3. Recent finality: Synced if we received a finalized block recently (< 120s)
+ * 4. Never synced during IBD (initial block download) - we might be behind
  *
  * The cold start case handles network-wide restarts where:
  * - All nodes have the same stale tip
@@ -40,10 +40,12 @@ static const int64_t PIV2_STALE_CHAIN_TIMEOUT = 5 * PIV2_SYNC_TIMEOUT;
  * - The chain has been dead for a while (tip very old)
  * - We need to allow DMM to produce the next block to restart finality
  *
- * IMPORTANT: Cold start check MUST come BEFORE IBD check because:
+ * IMPORTANT: Cold start and finality checks MUST come BEFORE IBD check because:
  * - IsInitialBlockDownload() returns true if tip is too old (nMaxTipAge)
  * - On a stale testnet, IBD will stay true forever (chicken-and-egg)
- * - Cold start allows DMM to produce a new block, which will make IBD false
+ * - Cold start allows DMM to produce a new block
+ * - After cold start, HU finality gives us confidence we're synced
+ * - IBD is legacy Bitcoin logic that doesn't understand HU
  */
 bool TierTwoSyncState::IsBlockchainSynced() const
 {
@@ -81,19 +83,23 @@ bool TierTwoSyncState::IsBlockchainSynced() const
         return true;
     }
 
-    // 3. Never say "synced" during IBD - we might be behind
-    // Note: This is checked AFTER cold start to avoid the chicken-and-egg problem
-    if (IsInitialBlockDownload()) {
-        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (IBD in progress)\n");
-        return false;
-    }
-
-    // 4. Normal case: we received a finalized block recently
+    // 3. Recent finality: if we received a finalized block recently, we're synced
+    // This MUST be checked BEFORE IBD because:
+    // - After cold start recovery, the first block gets created and finalized
+    // - But IBD may still be true (legacy Bitcoin code uses nMaxTipAge)
+    // - We should trust HU finality over legacy IBD logic
     int64_t lastFinalized = m_last_finalized_time.load();
     if (lastFinalized > 0 && (now - lastFinalized) <= PIV2_SYNC_TIMEOUT) {
         LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: true (recent finality, age=%ds)\n",
                  (int)(now - lastFinalized));
         return true;
+    }
+
+    // 4. Never say "synced" during IBD - we might be behind
+    // Note: This is checked AFTER cold start AND finality checks
+    if (IsInitialBlockDownload()) {
+        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (IBD in progress)\n");
+        return false;
     }
 
     // 5. Not synced - waiting for finality or still catching up

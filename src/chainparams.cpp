@@ -431,6 +431,7 @@ public:
         consensus.nHuQuorumRotationBlocks = 12;     // New quorum every 12 blocks
         consensus.nHuLeaderTimeoutSeconds = 45;     // DMM leader timeout (fallback after 45s)
         consensus.nHuFallbackRecoverySeconds = 15;  // Recovery window for fallback MNs
+        consensus.nDMMBootstrapHeight = 10;         // Bootstrap phase (no slot calculation for cold start)
         consensus.nHuMaxReorgDepth = 12;            // Max reorg before finality
 
         // spork keys
@@ -609,6 +610,7 @@ public:
         consensus.nHuQuorumRotationBlocks = 3;      // Fast rotation (every 3 blocks)
         consensus.nHuLeaderTimeoutSeconds = 30;     // Aggressive timeout for testing
         consensus.nHuFallbackRecoverySeconds = 10;  // Fast recovery for testnet
+        consensus.nDMMBootstrapHeight = 5;          // Bootstrap phase (no slot calculation for cold start)
         consensus.nHuMaxReorgDepth = 1;             // Finality at 1 block (quorum-based)
 
         // spork keys
@@ -804,6 +806,7 @@ public:
         consensus.nHuQuorumRotationBlocks = 1;      // Rotate every block
         consensus.nHuLeaderTimeoutSeconds = 5;      // Short timeout (less relevant in regtest)
         consensus.nHuFallbackRecoverySeconds = 2;   // Ultra-fast for regtest
+        consensus.nDMMBootstrapHeight = 2;          // Bootstrap phase (no slot calculation for cold start)
         consensus.nHuMaxReorgDepth = 100;           // Large tolerance for test scenarios
 
         /* Spork Key for RegTest:

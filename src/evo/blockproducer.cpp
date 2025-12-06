@@ -52,6 +52,15 @@ int GetProducerSlot(const CBlockIndex* pindexPrev, int64_t nBlockTime)
     }
 
     const Consensus::Params& consensus = Params().GetConsensus();
+
+    // BOOTSTRAP PHASE: During cold start (height <= nDMMBootstrapHeight),
+    // always return slot 0 (primary producer). This prevents timestamp
+    // issues when syncing a fresh chain where genesis time may be far in the past.
+    int nextHeight = pindexPrev->nHeight + 1;
+    if (nextHeight <= consensus.nDMMBootstrapHeight) {
+        return 0;
+    }
+
     int64_t prevTime = pindexPrev->GetBlockTime();
     int64_t dt = nBlockTime - prevTime;
 

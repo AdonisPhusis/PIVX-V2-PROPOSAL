@@ -323,6 +323,20 @@ static int64_t CalculateAlignedBlockTime(const CBlockIndex* pindexPrev, int64_t 
 
     const Consensus::Params& consensus = Params().GetConsensus();
     int64_t prevTime = pindexPrev->GetBlockTime();
+    int nextHeight = pindexPrev->nHeight + 1;
+
+    // BOOTSTRAP PHASE: During cold start (height <= nDMMBootstrapHeight),
+    // use max(prevTime + 1, nNow) instead of slot-aligned time.
+    // This prevents timestamp issues when syncing a fresh chain where
+    // genesis time may be far in the past (e.g., Dec 2024 vs Dec 2025).
+    // Producer is always primary (slot 0) during bootstrap - see GetProducerSlot().
+    if (nextHeight <= consensus.nDMMBootstrapHeight) {
+        outSlot = 0;
+        int64_t rawTime = std::max(prevTime + 1, nNow);
+        // Round DOWN to valid time slot
+        return (rawTime / consensus.nTimeSlotLength) * consensus.nTimeSlotLength;
+    }
+
     int64_t dt = nNow - prevTime;
 
     // Primary producer window: block can be produced immediately

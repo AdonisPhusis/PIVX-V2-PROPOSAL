@@ -7,6 +7,7 @@
 # Options:
 #   --reindex    Start daemons with -reindex flag
 #   --clean      Clean wallet and database before starting
+#   --wipe       FULL wipe: remove blocks/chainstate/evodb + reindex
 #   --stop       Only stop daemons (no start)
 #   --status     Only check status (no changes)
 #   --compile    Force git pull + make on compile nodes
@@ -52,6 +53,7 @@ NC='\033[0m' # No Color
 # Options
 REINDEX=false
 CLEAN=false
+WIPE=false
 STOP_ONLY=false
 STATUS_ONLY=false
 COMPILE=false
@@ -61,11 +63,12 @@ for arg in "$@"; do
     case $arg in
         --reindex) REINDEX=true ;;
         --clean) CLEAN=true ;;
+        --wipe) WIPE=true; REINDEX=true ;;  # Wipe implies reindex
         --stop) STOP_ONLY=true ;;
         --status) STATUS_ONLY=true ;;
         --compile) COMPILE=true ;;
         --help)
-            head -20 "$0" | tail -17
+            head -21 "$0" | tail -18
             exit 0
             ;;
     esac
@@ -118,10 +121,28 @@ get_daemon_path() {
     fi
 }
 
-# Function to stop daemon on a VPS
+# Function to stop daemon on a VPS (graceful stop with fallback to kill)
 stop_daemon() {
     local ip=$1
-    $SSH ubuntu@$ip "pkill -9 piv2d 2>/dev/null || true; sleep 1" 2>/dev/null
+    local cli_path=$(get_cli_path "$ip")
+
+    # Try graceful stop first
+    $SSH ubuntu@$ip "
+        # Attempt graceful shutdown
+        $cli_path -testnet stop 2>/dev/null && sleep 3 || true
+
+        # If still running, force kill
+        if pgrep piv2d >/dev/null 2>&1; then
+            pkill piv2d 2>/dev/null
+            sleep 2
+        fi
+
+        # Final check - force kill if absolutely necessary
+        if pgrep piv2d >/dev/null 2>&1; then
+            pkill -9 piv2d 2>/dev/null
+            sleep 1
+        fi
+    " 2>/dev/null
 }
 
 # Function to copy binaries to a VPS (for non-compile nodes)
@@ -163,7 +184,17 @@ start_daemon() {
     local daemon_path=$(get_daemon_path "$ip")
     local extra_args=""
 
-    if $CLEAN; then
+    # WIPE mode: delete blockchain data (blocks, chainstate, evodb)
+    if $WIPE; then
+        $SSH ubuntu@$ip "
+            rm -rf ~/.piv2/testnet5/blocks
+            rm -rf ~/.piv2/testnet5/chainstate
+            rm -rf ~/.piv2/testnet5/evodb
+            rm -f ~/.piv2/testnet5/wallet.dat ~/.piv2/testnet5/.walletlock
+            rm -rf ~/.piv2/testnet5/database ~/.piv2/testnet5/wallets
+        " 2>/dev/null
+    elif $CLEAN; then
+        # CLEAN mode: only wallet and database (keep blockchain)
         $SSH ubuntu@$ip "
             rm -f ~/.piv2/testnet5/wallet.dat ~/.piv2/testnet5/.walletlock
             rm -rf ~/.piv2/testnet5/database ~/.piv2/testnet5/wallets
@@ -228,6 +259,7 @@ echo ""
 echo "Options:"
 echo "  Reindex: $REINDEX"
 echo "  Clean: $CLEAN"
+echo "  Wipe: $WIPE"
 echo "  Compile: $COMPILE"
 echo ""
 echo "Nodes:"

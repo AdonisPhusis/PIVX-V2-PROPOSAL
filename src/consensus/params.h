@@ -176,6 +176,13 @@ struct Params {
     int nHuLeaderTimeoutSeconds;    // Timeout before fallback to next MN (45s mainnet)
     int nHuFallbackRecoverySeconds; // Recovery window for fallback MNs (15s testnet/mainnet)
 
+    // DMM Bootstrap phase - special rules for cold start
+    // During bootstrap (height <= nDMMBootstrapHeight):
+    // - Producer = always primary (scores[0]), no fallback slot calculation
+    // - nTime = max(prevTime + 1, nNow) instead of slot-aligned time
+    // This prevents timestamp issues when syncing a fresh chain from genesis
+    int nDMMBootstrapHeight;        // Bootstrap phase height (5 testnet, 10 mainnet)
+
     // Reorg protection
     int nHuMaxReorgDepth;           // Max reorg depth before finality (12 mainnet)
 

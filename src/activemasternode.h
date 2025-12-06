@@ -74,7 +74,16 @@ public:
     static bool IsValidNetAddr(const CService& addrIn);
 
     bool TryProducingBlock(const CBlockIndex* pindexPrev);
-    bool IsLocalBlockProducer(const CBlockIndex* pindexPrev) const;
+
+    /**
+     * Check if local MN is the designated block producer.
+     *
+     * @param pindexPrev       Previous block index
+     * @param outAlignedTime   [out] The aligned block timestamp to use if producing
+     * @return                 true if local MN should produce the next block
+     */
+    bool IsLocalBlockProducer(const CBlockIndex* pindexPrev, int64_t& outAlignedTime) const;
+
     void StartDMMScheduler();
     void StopDMMScheduler();
 };

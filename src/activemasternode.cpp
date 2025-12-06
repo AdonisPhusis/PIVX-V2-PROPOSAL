@@ -292,8 +292,69 @@ bool CActiveDeterministicMasternodeManager::IsValidNetAddr(const CService& addrI
 // DMM Block Producer Scheduler Implementation
 // ============================================================================
 
-bool CActiveDeterministicMasternodeManager::IsLocalBlockProducer(const CBlockIndex* pindexPrev) const
+/**
+ * Calculate the aligned block timestamp for production.
+ *
+ * This function calculates what nTime the block should have based on the
+ * current time and the slot grid. The scheduler must align nTime to slot
+ * boundaries so that verification (which uses the same slot calculation)
+ * produces identical results.
+ *
+ * Slot boundaries:
+ * - Slot 0 (primary): nTime in [prevTime, prevTime + leaderTimeout)
+ * - Slot 1 (fallback 1): nTime = prevTime + leaderTimeout
+ * - Slot 2 (fallback 2): nTime = prevTime + leaderTimeout + fallbackWindow
+ * - etc.
+ *
+ * @param pindexPrev     Previous block index
+ * @param nNow           Current local time
+ * @param outSlot        [out] Calculated slot index
+ * @return               Aligned block timestamp
+ */
+static int64_t CalculateAlignedBlockTime(const CBlockIndex* pindexPrev, int64_t nNow, int& outSlot)
 {
+    outSlot = 0;
+
+    if (!pindexPrev) {
+        return nNow;
+    }
+
+    const Consensus::Params& consensus = Params().GetConsensus();
+    int64_t prevTime = pindexPrev->GetBlockTime();
+    int64_t dt = nNow - prevTime;
+
+    // Primary producer window: block can be produced immediately
+    // nTime should be at least prevTime (but usually nNow for fresh blocks)
+    if (dt < consensus.nHuLeaderTimeoutSeconds) {
+        outSlot = 0;
+        // Use current time, but ensure it's >= prevTime
+        return std::max(nNow, prevTime);
+    }
+
+    // Past leader timeout - we're in fallback territory
+    // Calculate which fallback slot we're in and align nTime to slot boundary
+    int64_t extra = dt - consensus.nHuLeaderTimeoutSeconds;
+    int rawSlot = 1 + (extra / consensus.nHuFallbackRecoverySeconds);
+
+    // Clamp to max fallback slots
+    if (rawSlot > 360) {
+        rawSlot = 360;
+    }
+
+    outSlot = rawSlot;
+
+    // Align nTime to the START of this fallback slot
+    // This ensures verification produces the same slot index
+    int64_t alignedTime = prevTime + consensus.nHuLeaderTimeoutSeconds +
+                          (rawSlot - 1) * consensus.nHuFallbackRecoverySeconds;
+
+    return alignedTime;
+}
+
+bool CActiveDeterministicMasternodeManager::IsLocalBlockProducer(const CBlockIndex* pindexPrev, int64_t& outAlignedTime) const
+{
+    outAlignedTime = 0;
+
     if (!pindexPrev) {
         return false;
     }
@@ -306,13 +367,17 @@ bool CActiveDeterministicMasternodeManager::IsLocalBlockProducer(const CBlockInd
     // Get the MN list at this height
     CDeterministicMNList mnList = deterministicMNManager->GetListForBlock(pindexPrev);
 
-    // Use GetBlockProducerWithFallback to support timeout-based fallback
-    // This allows other MNs to produce if the primary producer is offline
+    // Calculate aligned block time and slot
+    int64_t nNow = GetTime();
+    int slot = 0;
+    int64_t alignedTime = CalculateAlignedBlockTime(pindexPrev, nNow, slot);
+
+    // Use GetExpectedProducer with the aligned time to check who should produce
+    // This uses the SAME function that verification will use
     CDeterministicMNCPtr expectedMn;
     int producerIndex = 0;
-    int64_t nNow = GetTime();
 
-    if (!mn_consensus::GetBlockProducerWithFallback(pindexPrev, mnList, nNow, expectedMn, producerIndex)) {
+    if (!mn_consensus::GetExpectedProducer(pindexPrev, alignedTime, mnList, expectedMn, producerIndex)) {
         // No confirmed MNs yet - we can't produce
         return false;
     }
@@ -321,11 +386,13 @@ bool CActiveDeterministicMasternodeManager::IsLocalBlockProducer(const CBlockInd
     bool isUs = (expectedMn->proTxHash == info.proTxHash);
 
     if (isUs) {
+        outAlignedTime = alignedTime;
         if (producerIndex > 0) {
-            LogPrintf("DMM-SCHEDULER: Local MN %s is FALLBACK producer #%d for block %d\n",
-                     info.proTxHash.ToString().substr(0, 16), producerIndex, pindexPrev->nHeight + 1);
+            LogPrintf("DMM-SCHEDULER: Local MN %s is FALLBACK producer #%d for block %d (slot=%d, alignedTime=%d)\n",
+                     info.proTxHash.ToString().substr(0, 16), producerIndex, pindexPrev->nHeight + 1,
+                     slot, alignedTime);
         } else {
-            LogPrint(BCLog::MASTERNODE, "DMM-SCHEDULER: Local MN %s is producer for block %d\n",
+            LogPrint(BCLog::MASTERNODE, "DMM-SCHEDULER: Local MN %s is PRIMARY producer for block %d\n",
                      info.proTxHash.ToString().substr(0, 16), pindexPrev->nHeight + 1);
         }
     }
@@ -397,13 +464,16 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
         return false;
     }
 
-    // Check if we are the designated producer
-    if (!IsLocalBlockProducer(pindexPrev)) {
+    // Check if we are the designated producer and get the aligned block time
+    // The aligned time is calculated based on slot boundaries and MUST be used
+    // as the block's nTime to ensure verification produces the same result
+    int64_t nAlignedBlockTime = 0;
+    if (!IsLocalBlockProducer(pindexPrev, nAlignedBlockTime)) {
         return false;
     }
 
-    LogPrintf("DMM-SCHEDULER: Block producer for height %d is local MN %s - creating block...\n",
-              nNextHeight, info.proTxHash.ToString().substr(0, 16));
+    LogPrintf("DMM-SCHEDULER: Block producer for height %d is local MN %s (alignedTime=%d) - creating block...\n",
+              nNextHeight, info.proTxHash.ToString().substr(0, 16), nAlignedBlockTime);
 
     // Get operator key
     CKey operatorKey;
@@ -440,6 +510,12 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
     }
 
     CBlock* pblock = &pblocktemplate->block;
+
+    // CRITICAL: Set the block's nTime to the aligned time calculated by IsLocalBlockProducer
+    // This ensures that verification (which uses GetExpectedProducer with block.nTime)
+    // produces the SAME producer as the scheduler determined.
+    // Without this, there would be a mismatch between production and verification.
+    pblock->nTime = nAlignedBlockTime;
 
     // Finalize merkle root (not done by CreateNewBlock when fTestValidity=false)
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);

@@ -60,6 +60,41 @@ bool GetBlockProducer(const CBlockIndex* pindexPrev,
                       CDeterministicMNCPtr& outMn);
 
 /**
+ * Calculate the producer slot from block header data.
+ *
+ * This is a PURE function that depends ONLY on block data (nTime, prevTime).
+ * It must produce identical results on ALL nodes for consensus.
+ *
+ * @param pindexPrev  Previous block index (for prevTime)
+ * @param nBlockTime  Block timestamp (from block header)
+ * @return            Producer slot index (0 = primary, 1+ = fallback)
+ */
+int GetProducerSlot(const CBlockIndex* pindexPrev, int64_t nBlockTime);
+
+/**
+ * Get the expected block producer based on block header data.
+ *
+ * This function uses GetProducerSlot() to determine which MN should have
+ * produced this block. The result is deterministic and identical on all nodes.
+ *
+ * IMPORTANT: This function is used BOTH by:
+ * 1. The scheduler (to check if local MN should produce)
+ * 2. Verification (to check if signature matches expected producer)
+ *
+ * @param pindexPrev       Previous block index
+ * @param nBlockTime       Block timestamp
+ * @param mnList           DMN list at pindexPrev
+ * @param outMn            [out] Expected producer MN
+ * @param outProducerIndex [out] Producer index (0 = primary, 1+ = fallback)
+ * @return                 true if producer found
+ */
+bool GetExpectedProducer(const CBlockIndex* pindexPrev,
+                         int64_t nBlockTime,
+                         const CDeterministicMNList& mnList,
+                         CDeterministicMNCPtr& outMn,
+                         int& outProducerIndex);
+
+/**
  * Select the block producer with fallback support for timeout recovery.
  *
  * If the primary producer hasn't produced a block within nHuLeaderTimeoutSeconds,

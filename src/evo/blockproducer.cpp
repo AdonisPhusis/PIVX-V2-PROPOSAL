@@ -186,9 +186,14 @@ bool VerifyBlockProducerSignature(const CBlock& block,
         return state.DoS(100, false, REJECT_INVALID, "bad-mn-no-prev");
     }
 
-    // Get expected producer
+    // Use GetBlockProducerWithFallback to support timeout-based fallback
+    // This allows the network to accept blocks from fallback producers
+    // when the primary producer is offline or slow
     CDeterministicMNCPtr expectedMn;
-    if (!GetBlockProducer(pindexPrev, mnList, expectedMn)) {
+    int producerIndex = 0;
+    int64_t nBlockTime = block.GetBlockTime();
+
+    if (!GetBlockProducerWithFallback(pindexPrev, mnList, nBlockTime, expectedMn, producerIndex)) {
         return state.DoS(100, false, REJECT_INVALID, "bad-mn-no-producer", false,
                          "No valid MN for this height");
     }
@@ -218,17 +223,23 @@ bool VerifyBlockProducerSignature(const CBlock& block,
                   "  - Block hash: %s\n"
                   "  - Sig size: %d\n"
                   "  - Expected pubkey: %s\n"
-                  "  - Expected MN: %s\n",
+                  "  - Expected MN: %s (index %d)\n",
                   __func__, hashToVerify.ToString(), block.vchBlockSig.size(),
-                  HexStr(pubKey), expectedMn->proTxHash.ToString());
+                  HexStr(pubKey), expectedMn->proTxHash.ToString(), producerIndex);
         return state.DoS(100, false, REJECT_INVALID, "bad-mn-sig-verify", false,
                          strprintf("ECDSA sig verification failed. Expected producer: %s",
                                    expectedMn->proTxHash.ToString()));
     }
 
-    LogPrint(BCLog::MASTERNODE, "%s: Block %s verified (ECDSA), producer: %s\n",
-             __func__, block.GetHash().ToString().substr(0, 16),
-             expectedMn->proTxHash.ToString().substr(0, 16));
+    if (producerIndex > 0) {
+        LogPrintf("%s: Block %s verified (ECDSA), FALLBACK producer #%d: %s\n",
+                 __func__, block.GetHash().ToString().substr(0, 16), producerIndex,
+                 expectedMn->proTxHash.ToString().substr(0, 16));
+    } else {
+        LogPrint(BCLog::MASTERNODE, "%s: Block %s verified (ECDSA), producer: %s\n",
+                 __func__, block.GetHash().ToString().substr(0, 16),
+                 expectedMn->proTxHash.ToString().substr(0, 16));
+    }
 
     return true;
 }

@@ -326,7 +326,10 @@ ArgsManager::ArgsManager() :
      * between mainnet and regtest/testnet won't cause problems due to these
      * parameters by accident. */
     m_network_only_args{
-      "-addnode", "-connect",
+      // Note: -addnode removed to allow global addnode config for all networks
+      // This simplifies testnet configuration and avoids the common mistake
+      // of putting addnode in global section instead of [test] section
+      "-connect",
       "-port", "-bind",
       "-rpcport", "-rpcbind",
       "-wallet",

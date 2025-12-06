@@ -316,7 +316,9 @@ static int64_t CalculateAlignedBlockTime(const CBlockIndex* pindexPrev, int64_t 
     outSlot = 0;
 
     if (!pindexPrev) {
-        return nNow;
+        // Round to nearest time slot for consensus validity
+        const int slotLength = Params().GetConsensus().nTimeSlotLength;
+        return (nNow / slotLength) * slotLength;
     }
 
     const Consensus::Params& consensus = Params().GetConsensus();
@@ -328,7 +330,9 @@ static int64_t CalculateAlignedBlockTime(const CBlockIndex* pindexPrev, int64_t 
     if (dt < consensus.nHuLeaderTimeoutSeconds) {
         outSlot = 0;
         // Use current time, but ensure it's >= prevTime
-        return std::max(nNow, prevTime);
+        // AND round DOWN to nearest valid time slot (divisible by nTimeSlotLength)
+        int64_t rawTime = std::max(nNow, prevTime);
+        return (rawTime / consensus.nTimeSlotLength) * consensus.nTimeSlotLength;
     }
 
     // Past leader timeout - we're in fallback territory
@@ -347,6 +351,13 @@ static int64_t CalculateAlignedBlockTime(const CBlockIndex* pindexPrev, int64_t 
     // This ensures verification produces the same slot index
     int64_t alignedTime = prevTime + consensus.nHuLeaderTimeoutSeconds +
                           (rawSlot - 1) * consensus.nHuFallbackRecoverySeconds;
+
+    // Round UP to nearest valid time slot (divisible by nTimeSlotLength)
+    // This ensures the timestamp is valid for consensus AND stays within this slot
+    int64_t slotLen = consensus.nTimeSlotLength;
+    if (alignedTime % slotLen != 0) {
+        alignedTime = ((alignedTime / slotLen) + 1) * slotLen;
+    }
 
     return alignedTime;
 }

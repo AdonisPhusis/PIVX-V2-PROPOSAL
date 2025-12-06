@@ -354,18 +354,32 @@ bool CActiveDeterministicMasternodeManager::TryProducingBlock(const CBlockIndex*
         return false;
     }
 
-    // Quorum check: previous block must have 2/3 signatures
-    if (!hu::PreviousBlockHasQuorum(pindexPrev)) {
-        static int64_t nLastQuorumWarnTime = 0;
+    // PIV2 v2: HU quorum is now DECOUPLED from block production
+    // =========================================================
+    // Design principle (ETH2/Tendermint pattern):
+    // - DMM produces blocks based on IsBlockchainSynced() only
+    // - HU finality runs asynchronously and seals blocks after-the-fact
+    // - Anti-reorg protection: never reorg below lastFinalizedHeight
+    // - This ensures LIVENESS even when some MNs are offline
+    //
+    // The old design blocked block production until quorum was reached,
+    // which caused chain stalls when MNs went offline (e.g., overnight).
+    //
+    // Now we just log the quorum status for monitoring purposes.
+    {
+        const Consensus::Params& consensus = Params().GetConsensus();
+        int sigCount = hu::huSignalingManager ? hu::huSignalingManager->GetSignatureCount(pindexPrev->GetBlockHash()) : 0;
+        bool hasQuorum = hu::PreviousBlockHasQuorum(pindexPrev);
+
+        // Log quorum status (not blocking)
+        static int64_t nLastQuorumLogTime = 0;
         int64_t nNow = GetTime();
-        if (nNow - nLastQuorumWarnTime > 30) {
-            const Consensus::Params& consensus = Params().GetConsensus();
-            int sigCount = hu::huSignalingManager ? hu::huSignalingManager->GetSignatureCount(pindexPrev->GetBlockHash()) : 0;
-            LogPrintf("DMM-SCHEDULER: Waiting for quorum on block %d (%d/%d signatures)\n",
-                      pindexPrev->nHeight, sigCount, consensus.nHuQuorumThreshold);
-            nLastQuorumWarnTime = nNow;
+        if (nNow - nLastQuorumLogTime > 60) {
+            LogPrint(BCLog::MASTERNODE, "DMM-SCHEDULER: Block %d HU status: %d/%d signatures (%s)\n",
+                      pindexPrev->nHeight, sigCount, consensus.nHuQuorumThreshold,
+                      hasQuorum ? "finalized" : "pending");
+            nLastQuorumLogTime = nNow;
         }
-        return false;
     }
 
     // Rate limiting - prevent double production

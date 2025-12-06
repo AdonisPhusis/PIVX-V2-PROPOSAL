@@ -29,26 +29,25 @@ static const int64_t PIV2_STALE_CHAIN_TIMEOUT = 5 * PIV2_SYNC_TIMEOUT;
  * PIV2: Simplified sync check based on HU finality
  *
  * Logic:
- * 1. Never synced during IBD (initial block download)
- * 2. Bootstrap phase (height <= 5): Always synced
- * 3. Normal operation: Synced if we received a finalized block recently (< 120s)
- * 4. Cold start recovery: If tip is very old (stale chain), allow DMM to restart
+ * 1. Bootstrap phase (height <= 5): Always synced
+ * 2. Cold start recovery: If tip is very old (stale chain), bypass IBD and allow restart
+ * 3. Never synced during IBD (initial block download) - we might be behind
+ * 4. Normal operation: Synced if we received a finalized block recently (< 120s)
  *
  * The cold start case handles network-wide restarts where:
  * - All nodes have the same stale tip
  * - No recent finalized blocks exist
- * - IBD is complete (no headers ahead)
+ * - The chain has been dead for a while (tip very old)
  * - We need to allow DMM to produce the next block to restart finality
+ *
+ * IMPORTANT: Cold start check MUST come BEFORE IBD check because:
+ * - IsInitialBlockDownload() returns true if tip is too old (nMaxTipAge)
+ * - On a stale testnet, IBD will stay true forever (chicken-and-egg)
+ * - Cold start allows DMM to produce a new block, which will make IBD false
  */
 bool TierTwoSyncState::IsBlockchainSynced() const
 {
-    // 1. Never say "synced" during IBD - we might be behind
-    if (IsInitialBlockDownload()) {
-        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (IBD in progress)\n");
-        return false;
-    }
-
-    // Get current chain tip
+    // Get current chain tip first - needed for all checks
     const CBlockIndex* tip = nullptr;
     {
         LOCK(cs_main);
@@ -63,28 +62,37 @@ bool TierTwoSyncState::IsBlockchainSynced() const
     int height = tip->nHeight;
     int64_t tipTime = tip->GetBlockTime();
     int64_t now = GetTime();
+    int64_t tipAge = now - tipTime;
 
-    // 2. Bootstrap phase: blocks 0-5 are always considered synced
+    // 1. Bootstrap phase: blocks 0-5 are always considered synced
     // This allows DMM to start producing block 6 without waiting for HU signatures
     if (height <= PIV2_BOOTSTRAP_HEIGHT) {
         LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: true (bootstrap phase, height=%d)\n", height);
         return true;
     }
 
-    // 3. Normal case: we received a finalized block recently
+    // 2. Cold start recovery: tip is very old (network was stopped)
+    // This MUST be checked BEFORE IBD because IBD stays true on stale tips!
+    // If tip is stale, we're on a dead network that needs restart.
+    // We bypass IBD check to allow DMM to produce the next block.
+    if (tipAge > PIV2_STALE_CHAIN_TIMEOUT) {
+        LogPrintf("IsBlockchainSynced: true (COLD START RECOVERY - tip age=%ds, bypassing IBD)\n",
+                 (int)tipAge);
+        return true;
+    }
+
+    // 3. Never say "synced" during IBD - we might be behind
+    // Note: This is checked AFTER cold start to avoid the chicken-and-egg problem
+    if (IsInitialBlockDownload()) {
+        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: false (IBD in progress)\n");
+        return false;
+    }
+
+    // 4. Normal case: we received a finalized block recently
     int64_t lastFinalized = m_last_finalized_time.load();
     if (lastFinalized > 0 && (now - lastFinalized) <= PIV2_SYNC_TIMEOUT) {
         LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: true (recent finality, age=%ds)\n",
                  (int)(now - lastFinalized));
-        return true;
-    }
-
-    // 4. Cold start recovery: tip is very old (network was stopped)
-    // If IBD is done and tip is stale, we're on a dead network that needs restart
-    int64_t tipAge = now - tipTime;
-    if (tipAge > PIV2_STALE_CHAIN_TIMEOUT) {
-        LogPrint(BCLog::MASTERNODE, "IsBlockchainSynced: true (cold start recovery, tip age=%ds)\n",
-                 (int)tipAge);
         return true;
     }
 
